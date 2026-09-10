@@ -1,0 +1,230 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * TonTon Doces — Design System
+ * Paleta: roxo escuro #3d1a5e, dourado #c8962a, creme/off-white, chocolate
+ * Fontes: Playfair Display (display) + Inter (body)
+ */
+
+@theme inline {
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-glow: var(--primary-glow);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-cream: var(--cream);
+  --color-chocolate: var(--chocolate);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+}
+
+:root {
+  --radius: 0.875rem;
+
+  /* Rosa claro #ffc9d2 background */
+  --background: #fff5f7;
+  --foreground: #5c1f5c;
+
+  --card: #ffffff;
+  --card-foreground: #5c1f5c;
+
+  --popover: #ffffff;
+  --popover-foreground: #5c1f5c;
+
+  /* Roxo #5c1f5c */
+  --primary: #5c1f5c;
+  --primary-foreground: #fff5f7;
+  --primary-glow: #5c1f5c;
+
+  /* Dourado #bd9248 */
+  --gold: #bd9248;
+  --gold-foreground: #ffffff;
+
+  --cream: #ffc9d2;
+  --chocolate: #5c1f5c;
+
+  --secondary: #ffc9d2;
+  --secondary-foreground: #5c1f5c;
+
+  --muted: #fde4e8;
+  --muted-foreground: #7a4a66;
+
+  --accent: #bd9248;
+  --accent-foreground: #ffffff;
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0.012 80);
+
+  --border: #f4d4da;
+  --input: #f4d4da;
+  --ring: #5c1f5c;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    font-family: var(--font-sans);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+}
+
+:root {
+  --wa-bottom: 24px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --wa-bottom: 80px;
+  }
+}
+
+@keyframes wa-pulse {
+  0% { box-shadow: 0 4px 20px rgba(0,0,0,0.2), 0 0 0 0 rgba(37, 211, 102, 0.55); }
+  70% { box-shadow: 0 4px 20px rgba(0,0,0,0.2), 0 0 0 16px rgba(37, 211, 102, 0); }
+  100% { box-shadow: 0 4px 20px rgba(0,0,0,0.2), 0 0 0 0 rgba(37, 211, 102, 0); }
+}
+
+.animate-wa-pulse {
+  animation: wa-pulse 2s ease-out infinite;
+}
+
+.hero-tonton {
+  height: 300px;
+  position: relative;
+}
+.hero-tonton-bg {
+  display: none;
+}
+.hero-tonton-left {
+  width: 40%;
+  background-color: #5c1f5c;
+  padding: 32px 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  position: relative;
+  z-index: 2;
+}
+.hero-tonton-logo {
+  max-width: 70px;
+  height: auto;
+  margin-bottom: 16px;
+}
+.hero-tonton-right {
+  width: 60%;
+  overflow: hidden;
+}
+.hero-tonton-title {
+  font-family: "Playfair Display", Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.4rem;
+  color: #ffffff;
+  line-height: 1.4;
+  max-width: 260px;
+  margin: 0;
+}
+.hero-tonton-sub {
+  font-family: "DM Sans", "Inter", system-ui, sans-serif;
+  font-size: 0.85rem;
+  color: #f5e6c8;
+  margin: 0;
+}
+.hero-tonton-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+}
+.hero-tonton-wa {
+  font-size: 12px;
+  color: #f5e6c8;
+  font-family: "DM Sans", "Inter", system-ui, sans-serif;
+  opacity: 0.9;
+  text-decoration: none;
+  width: fit-content;
+}
+.hero-tonton-status {
+  font-family: "DM Sans", "Inter", system-ui, sans-serif;
+  font-size: 11px;
+  color: #f5e6c8;
+  opacity: 0.7;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .hero-tonton {
+    height: 220px;
+  }
+  .hero-tonton-left {
+    padding: 16px 14px;
+    gap: 6px;
+  }
+  .hero-tonton-logo {
+    max-width: 48px;
+    margin-bottom: 6px;
+  }
+  .hero-tonton-title {
+    font-size: 0.95rem;
+    line-height: 1.3;
+    max-width: 100%;
+  }
+  .hero-tonton-sub {
+    font-size: 0.7rem;
+  }
+  .hero-tonton-meta {
+    margin-top: 8px;
+    gap: 4px;
+  }
+  .hero-tonton-wa,
+  .hero-tonton-status {
+    font-size: 10px;
+  }
+}
+
