@@ -10,9 +10,9 @@ import imgCamafeu from "@/assets/produtos/camafeu.webp";
 import imgDoceEncanto from "@/assets/produtos/doce-encanto.webp";
 import imgNevadinho from "@/assets/produtos/nevadinho.webp";
 import imgNevadinho2 from "@/assets/produtos/nevadinho-2.webp";
-import imgBombomUva from "@/assets/produtos/bombom-uva.webp";
-import imgBombomMorango from "@/assets/produtos/bombom-morango.webp";
-import imgBombomMorango2 from "@/assets/produtos/bombom-morango-2.webp";
+import imgBombomUva from "@/assets/produtos/bombom-copo-uva.jpeg";
+import imgBombomMorango from "@/assets/produtos/bombom-copo-morango.jpeg";
+import imgBombomMorango2 from "@/assets/produtos/bombom-copo-dois-sabores.jpeg";
 import imgBrigadeiros from "@/assets/produtos/brigadeiros-artesanais.webp";
 import imgPrazerCamadas from "@/assets/produtos/prazer-em-camadas.webp";
 import imgBrownie from "@/assets/produtos/brownie.webp";
@@ -26,8 +26,8 @@ import imgBrigadeiroOreo from "@/assets/produtos/brigadeiro-oreo.jpeg";
 import imgBrigadeiroNinhoOreo from "@/assets/produtos/brigadeiro-ninho-oreo.png";
 import imgEspetinhoMorangoChoc from "@/assets/produtos/espetinho-morango-choc.png";
 import imgEspetinhoMorangoNinho from "@/assets/produtos/espetinho-morango-ninho.jpeg";
-import imgMorangoCravejadoTradicional from "@/assets/produtos/morango-cravejado-tradicional.jpeg.asset.json";
-import imgMorangoCravejadoMaracuja from "@/assets/produtos/morango-cravejado-maracuja.jpeg.asset.json";
+import imgMorangoCravejadoTradicional from "@/assets/produtos/morango-cravejado-tradicional.jpeg";
+import imgMorangoCravejadoMaracuja from "@/assets/produtos/morango-cravejado-maracuja.jpeg";
 
 export type Flavor = {
   id: string;
@@ -129,7 +129,7 @@ export const BOMBOM_FLAVORS: Flavor[] = [
   },
   {
     id: "ninho-uva",
-    name: "Bombom no Pote — Mousse de Ninho e Uvas",
+    name: "Bombom no Copo — Mousse de Ninho e Uvas",
     description:
       "Mousse de Ninho aveludada abraçando uvas geladinhas. Leve, cremoso e viciante.",
     image: imgBombomUva,
@@ -174,7 +174,7 @@ export const CATEGORIES: Category[] = [
         "morango-cravejado-tradicional",
         "Morango Cravejado Tradicional",
         19.9,
-        imgMorangoCravejadoTradicional.url,
+        imgMorangoCravejadoTradicional,
         {
           description:
             "Morango fresco banhado no chocolate branco e cravejado com crocância. O clássico que conquista na primeira mordida.",
@@ -184,7 +184,7 @@ export const CATEGORIES: Category[] = [
         "morango-cravejado-maracuja",
         "Morango Cravejado de Maracujá",
         19.9,
-        imgMorangoCravejadoMaracuja.url,
+        imgMorangoCravejadoMaracuja,
         {
           description:
             "Morango fresco banhado no chocolate branco com toque azedinho e crocante de maracujá. Uma explosão de sabores.",
@@ -225,12 +225,12 @@ export const CATEGORIES: Category[] = [
       ),
       p(
         "combo-experiencia-a-dois",
-        "Experiência a Dois | 1 Copo + 1 Bombom no Pote + 2 Camafeus",
+        "Experiência a Dois | 1 Copo + 1 Bombom no Copo + 2 Camafeus",
         85.5,
         imgExperienciaADois,
         {
           description:
-            "O kit completo: copo, bombom no pote e dois camafeus. Pra noite ficar inesquecível.",
+            "O kit completo: copo, bombom no copo e dois camafeus. Pra noite ficar inesquecível.",
           flavorPicks: [
             { count: 1, from: "copo" },
             { count: 1, from: "bombom" },
@@ -312,7 +312,7 @@ export const CATEGORIES: Category[] = [
   },
   {
     id: "bombom",
-    title: "Bombom de Pote",
+    title: "Bombom no Copo",
     description: "",
     products: [
       p("bombom-uva-morango", "Bombom Dois Sabores — Uva e Morango", 21.9, imgBombomMorango2, {
@@ -320,7 +320,7 @@ export const CATEGORIES: Category[] = [
           "250g de uvas e morangos frescos afundando em brigadeiro cremoso com ganache espelhada. Impossível comer devagar.",
         originalPrice: 28.9,
       }),
-      p("bombom-ninho-uva", "Bombom no Pote — Mousse de Ninho e Uvas", 21.9, imgBombomUva, {
+      p("bombom-ninho-uva", "Bombom no Copo — Mousse de Ninho e Uvas", 21.9, imgBombomUva, {
         description:
           "250g de mousse de Ninho aveludada abraçando uvas geladinhas. Leve, cremoso e viciante.",
         originalPrice: 28.9,

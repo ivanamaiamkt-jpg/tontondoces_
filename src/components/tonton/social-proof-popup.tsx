@@ -20,7 +20,7 @@ const PRODUCTS = [
   "Copo Merengue",
   "Copo Doce Paixão",
   "Bombom Dois Sabores",
-  "Bombom no Pote de Ninho e Uvas",
+  "Bombom no Copo de Ninho e Uvas",
   "Bombom Mousse de Ninho e Morango",
   "Brigadeiros Artesanais",
   "Surpresa de Uva com Ninho",
