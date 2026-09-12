@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
-import { OWNER_WHATSAPP } from "@/lib/menu-data";
+import { OWNER_WHATSAPP, MIN_ORDER } from "@/lib/menu-data";
 import { getStoreStatus } from "@/lib/store-hours";
-
-const MIN_ORDER = 25;
 
 export function StoreStatus() {
   const [status, setStatus] = useState(() => getStoreStatus());

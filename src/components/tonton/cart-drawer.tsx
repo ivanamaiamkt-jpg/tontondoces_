@@ -4,7 +4,7 @@ import { useOrder } from "@/contexts/order-context";
 import { brl } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { CheckoutSheet } from "./checkout-sheet";
-import { getSuggestionProducts } from "@/lib/menu-data";
+import { getSuggestionProducts, MIN_ORDER } from "@/lib/menu-data";
 import { toast } from "sonner";
 import { trackPixel } from "@/lib/fbq";
 
@@ -222,6 +222,13 @@ export function CartDrawer() {
                   )}
                 </dl>
               </div>
+
+              {subtotal < MIN_ORDER && (
+                <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                  ⚠️ Pedido mínimo de {brl(MIN_ORDER)}. Faltam{" "}
+                  <strong>{brl(MIN_ORDER - subtotal)}</strong> pra liberar o pedido.
+                </div>
+              )}
             </>
           )}
         </div>
@@ -230,6 +237,7 @@ export function CartDrawer() {
           <div className="absolute bottom-0 left-0 right-0 border-t border-border bg-background/95 p-4 shadow-[0_-8px_24px_-8px_rgba(61,26,94,0.25)] backdrop-blur">
             <Button
               size="lg"
+              disabled={subtotal < MIN_ORDER}
               className="w-full justify-between bg-primary text-base font-semibold text-primary-foreground shadow-lg hover:bg-primary-glow"
               onClick={() => {
                 trackPixel("InitiateCheckout", {
@@ -242,7 +250,11 @@ export function CartDrawer() {
                 setCheckoutOpen(true);
               }}
             >
-              <span>Finalizar pedido</span>
+              <span>
+                {subtotal < MIN_ORDER
+                  ? `Faltam ${brl(MIN_ORDER - subtotal)}`
+                  : "Finalizar pedido"}
+              </span>
               <span className="font-display text-lg">{brl(total)}</span>
             </Button>
           </div>

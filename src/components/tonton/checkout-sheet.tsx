@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Check, Heart, Copy, MessageCircle, Loader2, ArrowLeft } from "lucide-react";
 import { useOrder } from "@/contexts/order-context";
-import { OWNER_WHATSAPP } from "@/lib/menu-data";
+import { OWNER_WHATSAPP, MIN_ORDER } from "@/lib/menu-data";
 import { brl, maskPhone, maskCep } from "@/lib/format";
 import { quoteDelivery, STORE_ADDRESS, STORE_NEIGHBORHOOD } from "@/lib/delivery";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,6 @@ import { getStoreStatus } from "@/lib/store-hours";
 import { isPaused, PAUSE_WHATSAPP_NOTE } from "@/lib/pause-mode";
 
 const PIX_KEY = "diretorios.tonton@gmail.com";
-const MIN_ORDER = 25;
 
 type FeeState =
   | { kind: "idle" }
@@ -205,7 +204,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
   };
 
   const handleSubmit = async () => {
-    if (!step1Valid || !step2Valid || submitting) return;
+    if (!step1Valid || !step2Valid || submitting || subtotal < MIN_ORDER) return;
     setSubmitting(true);
     const orderId = `TT-${Date.now().toString().slice(-6)}`;
     const outOfAreaNote = "Fora da área — cliente vai pedir Uber entrega ou retirar.";

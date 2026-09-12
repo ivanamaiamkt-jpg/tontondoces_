@@ -420,6 +420,7 @@ export function getDeliveryFee(neighborhood: string): number | null {
 }
 
 export const OWNER_WHATSAPP = "5515998564202";
+export const MIN_ORDER = 25;
 
 export function getSuggestionProducts(): Product[] {
   const out: Product[] = [];
