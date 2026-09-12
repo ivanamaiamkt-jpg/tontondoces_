@@ -3,7 +3,7 @@ import { X, Check, Heart, Copy, MessageCircle, Loader2, ArrowLeft } from "lucide
 import { useOrder } from "@/contexts/order-context";
 import { OWNER_WHATSAPP } from "@/lib/menu-data";
 import { brl, maskPhone, maskCep } from "@/lib/format";
-import { quoteDelivery, STORE_ADDRESS, STORE_NEIGHBORHOOD, MAX_DELIVERY_KM } from "@/lib/delivery";
+import { quoteDelivery, STORE_ADDRESS, STORE_NEIGHBORHOOD } from "@/lib/delivery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -594,9 +594,10 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                   )}
                   {fee.kind === "out" && !acceptedOutOfArea && (
                     <div className="space-y-2 rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                      <p className="font-medium">⚠️ Fora da área de entrega</p>
                       <p>
-                        ⚠️ Fora da área de entrega (bairro {STORE_NEIGHBORHOOD}, até{" "}
-                        {MAX_DELIVERY_KM}km).
+                        Estamos no bairro {STORE_NEIGHBORHOOD}, você pode pedir um Uber ou
+                        retirar aqui.
                       </p>
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -604,7 +605,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                           onClick={() => setAcceptedOutOfArea(true)}
                           className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-glow"
                         >
-                          Quero seguir mesmo assim
+                          Quero seguir
                         </button>
                         <button
                           type="button"

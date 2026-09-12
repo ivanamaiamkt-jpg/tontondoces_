@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Loader2, MapPin, MessageCircle, Calculator } from "lucide-react";
 import { useOrder } from "@/contexts/order-context";
 import { OWNER_WHATSAPP } from "@/lib/menu-data";
-import { quoteDelivery, STORE_NEIGHBORHOOD, MAX_DELIVERY_KM } from "@/lib/delivery";
+import { quoteDelivery, STORE_NEIGHBORHOOD } from "@/lib/delivery";
 import { brl, maskCep } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -280,9 +280,10 @@ export function DeliveryGate({
 
                   {quote.kind === "out" && (
                     <div className="space-y-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
-                      <p className="font-medium text-destructive">
-                        ⚠️ Fora da área de entrega (bairro {STORE_NEIGHBORHOOD}, até{" "}
-                        {MAX_DELIVERY_KM}km).
+                      <p className="font-medium text-destructive">⚠️ Fora da área de entrega</p>
+                      <p className="text-muted-foreground">
+                        Estamos no bairro {STORE_NEIGHBORHOOD}, você pode pedir um Uber ou
+                        retirar aqui.
                       </p>
 
                       <a
