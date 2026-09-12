@@ -1,5 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
 import { OWNER_WHATSAPP } from "@/lib/menu-data";
@@ -48,6 +60,7 @@ type Order = {
   event_date: string | null;
   items: OrderItem[];
   created_at: string;
+  pos_venda_feito: boolean;
 };
 
 type ColumnDef = {
@@ -62,8 +75,9 @@ type ColumnDef = {
 const COLUMNS: ColumnDef[] = [
   { id: "novo", title: "Novo", emoji: "🆕", bg: "#fff8e1", headerBg: "#f59e0b", headerText: "#fff" },
   { id: "em_producao", title: "Em produção", emoji: "👩‍🍳", bg: "#e7f1ff", headerBg: "#2563eb", headerText: "#fff" },
-  { id: "pronto", title: "Pronto", emoji: "✅", bg: "#e6f6ea", headerBg: "#16a34a", headerText: "#fff" },
-  { id: "entregue", title: "Entregue", emoji: "🛵", bg: "#eef0f2", headerBg: "#6b7280", headerText: "#fff" },
+  { id: "aguardando_entrega", title: "Aguardando entrega", emoji: "📦", bg: "#fef3c7", headerBg: "#d97706", headerText: "#fff" },
+  { id: "na_rua", title: "Na rua", emoji: "🛵", bg: "#ecfeff", headerBg: "#0891b2", headerText: "#fff" },
+  { id: "entregue", title: "Entregue", emoji: "✅", bg: "#eef0f2", headerBg: "#6b7280", headerText: "#fff" },
 ];
 
 function formatTime(iso: string) {
@@ -132,7 +146,172 @@ function buildReadyMsg(o: Order) {
     o.payment_method === "pix"
       ? `\n\nChave PIX: ${PIX_KEY}\nValor: ${brl(Number(o.total))}`
       : `\n\nPagamento na entrega na maquininha 💳`;
-  return `Oi ${first}! 🍫 Seu pedido #${o.order_number} está prontinho e a caminho!${pay}\n\nQualquer dúvida é só chamar! 💕`;
+  return `Oi ${first}! 🍫 Seu pedido #${o.order_number} está prontinho e já vamos providenciar a entrega!${pay}\n\nQualquer dúvida é só chamar! 💕`;
+}
+
+function buildMotoboyMsg(o: Order) {
+  const enderecoLine =
+    o.delivery_mode === "delivery"
+      ? `${o.street ?? ""}, ${o.number ?? ""}${o.complement ? ` — ${o.complement}` : ""} — ${o.neighborhood ?? ""} — ${o.city ?? ""}`
+      : "Retirada no local";
+  const itensLine = o.items
+    .map((it) => `${it.quantity}x ${it.productName}`)
+    .join(", ");
+  const pagamentoLine =
+    o.payment_method === "pix" ? "PIX (já pago)" : "Maquininha (cobrar na entrega)";
+  return `🛵 Nova entrega — TonTon Doces\nCliente: ${o.customer_name} — ${o.customer_phone}\nEndereço: ${enderecoLine}\nItens: ${itensLine}\nTotal: ${brl(Number(o.total))} — Pagamento: ${pagamentoLine}`;
+}
+
+type CardHandlers = {
+  now: number;
+  onOpenDetail: (o: Order) => void;
+  onAccept: (o: Order) => void;
+  onReject: (o: Order) => void;
+  onReady: (o: Order) => void;
+  onDispatch: (o: Order) => void;
+  onDelivered: (o: Order) => void;
+  onTogglePosVenda: (o: Order) => void;
+  onRemove: (id: string) => void;
+};
+
+function OrderCardBody({ order: o, colId, h }: { order: Order; colId: string; h: CardHandlers }) {
+  return (
+    <>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="font-bold text-foreground">#{o.order_number}</p>
+        <p className="text-[11px] text-muted-foreground">{timeAgo(o.created_at, h.now)}</p>
+      </div>
+      <p className="mt-0.5 truncate text-sm text-foreground">
+        {o.customer_name}{" "}
+        <span className="text-xs text-muted-foreground">· {formatTime(o.created_at)}</span>
+      </p>
+      <p className="mt-1 truncate text-xs text-muted-foreground">
+        {o.delivery_mode === "delivery" ? o.neighborhood ?? "Entrega" : "Retirada"} ·{" "}
+        {o.payment_method === "pix" ? "PIX" : "Maquininha"}
+      </p>
+      <p className="mt-1 font-display text-lg text-primary">{brl(Number(o.total))}</p>
+
+      <div className="mt-2 flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <a
+          href={waLink(o.customer_phone, `Oi ${o.customer_name.split(" ")[0]}! Sobre o pedido #${o.order_number} 💜`)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-1 text-[11px] font-medium text-green-800 hover:bg-green-200"
+        >
+          <MessageCircle className="h-3 w-3" /> WhatsApp
+        </a>
+
+        {colId === "novo" && (
+          <>
+            <button
+              onClick={() => h.onAccept(o)}
+              className="inline-flex items-center gap-1 rounded-md bg-green-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-green-700"
+            >
+              <Check className="h-3 w-3" /> Aceitar
+            </button>
+            <button
+              onClick={() => h.onReject(o)}
+              className="inline-flex items-center gap-1 rounded-md bg-red-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-red-700"
+            >
+              <Ban className="h-3 w-3" /> Recusar
+            </button>
+          </>
+        )}
+        {colId === "em_producao" && (
+          <button
+            onClick={() => h.onReady(o)}
+            className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-blue-700"
+          >
+            <Check className="h-3 w-3" /> Pronto
+          </button>
+        )}
+        {colId === "aguardando_entrega" && (
+          <button
+            onClick={() => h.onDispatch(o)}
+            className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-amber-700"
+          >
+            <MessageCircle className="h-3 w-3" /> Saiu pra entrega
+          </button>
+        )}
+        {colId === "na_rua" && (
+          <button
+            onClick={() => h.onDelivered(o)}
+            className="inline-flex items-center gap-1 rounded-md bg-gray-700 px-2 py-1 text-[11px] font-semibold text-white hover:bg-gray-800"
+          >
+            <Check className="h-3 w-3" /> Entregue
+          </button>
+        )}
+        {colId === "entregue" && (
+          <button
+            onClick={() => h.onTogglePosVenda(o)}
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold ${
+              o.pos_venda_feito
+                ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                : "bg-muted text-muted-foreground hover:bg-muted/70"
+            }`}
+          >
+            <Check className="h-3 w-3" />
+            {o.pos_venda_feito ? "Pós-venda feito" : "Pós-venda pendente"}
+          </button>
+        )}
+        <button
+          onClick={() => h.onRemove(o.id)}
+          className="ml-auto rounded-md p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
+          aria-label="Excluir"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </>
+  );
+}
+
+function KanbanCard({ order, colId, h }: { order: Order; colId: string; h: CardHandlers }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: order.id });
+  return (
+    <article
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={() => h.onOpenDetail(order)}
+      style={{ opacity: isDragging ? 0.4 : 1, touchAction: "none" }}
+      className="cursor-grab rounded-xl border border-black/5 bg-white p-3 shadow-sm transition-all hover:shadow-md active:scale-[0.99] active:cursor-grabbing"
+    >
+      <OrderCardBody order={order} colId={colId} h={h} />
+    </article>
+  );
+}
+
+function KanbanColumn({ col, orders: list, h }: { col: ColumnDef; orders: Order[]; h: CardHandlers }) {
+  const { setNodeRef, isOver } = useDroppable({ id: col.id });
+  return (
+    <section
+      className="flex w-[280px] flex-col rounded-2xl shadow-sm sm:w-auto"
+      style={{ backgroundColor: col.bg }}
+    >
+      <div
+        className="flex items-center justify-between rounded-t-2xl px-3 py-2 text-sm font-semibold"
+        style={{ backgroundColor: col.headerBg, color: col.headerText }}
+      >
+        <span>
+          {col.emoji} {col.title}
+        </span>
+        <span className="rounded-full bg-white/30 px-2 py-0.5 text-xs">{list.length}</span>
+      </div>
+      <div
+        ref={setNodeRef}
+        className={`flex min-h-[80px] flex-col gap-2 rounded-b-2xl p-2 transition-colors ${
+          isOver ? "bg-primary/10 ring-2 ring-inset ring-primary/40" : ""
+        }`}
+      >
+        {list.length === 0 ? (
+          <p className="px-2 py-6 text-center text-xs text-muted-foreground">Vazio</p>
+        ) : (
+          list.map((o) => <KanbanCard key={o.id} order={o} colId={col.id} h={h} />)
+        )}
+      </div>
+    </section>
+  );
 }
 
 function PedidosPage() {
@@ -142,9 +321,26 @@ function PedidosPage() {
   const [detail, setDetail] = useState<Order | null>(null);
   const [banner, setBanner] = useState<{ name: string; total: number } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [motoboyWhatsapp, setMotoboyWhatsapp] = useState<string>("");
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  );
   const knownIds = useRef<Set<string>>(new Set());
   const firstLoad = useRef(true);
   const originalTitle = useRef<string>("");
+
+  useEffect(() => {
+    (async () => {
+      const { data } = (await supabase
+        .from("store_settings" as never)
+        .select("value")
+        .eq("key", "motoboy_whatsapp")
+        .maybeSingle()) as unknown as { data: { value: string } | null };
+      if (data?.value) setMotoboyWhatsapp(data.value);
+    })();
+  }, []);
 
   // Tick para "há X min"
   useEffect(() => {
@@ -205,7 +401,13 @@ function PedidosPage() {
   }, []);
 
   const grouped = useMemo(() => {
-    const g: Record<string, Order[]> = { novo: [], em_producao: [], pronto: [], entregue: [] };
+    const g: Record<string, Order[]> = {
+      novo: [],
+      em_producao: [],
+      aguardando_entrega: [],
+      na_rua: [],
+      entregue: [],
+    };
     orders.forEach((o) => {
       if (g[o.status]) g[o.status].push(o);
     });
@@ -223,6 +425,20 @@ function PedidosPage() {
       toast.error("Erro: " + error.message);
       load();
     }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveOrder(orders.find((o) => o.id === String(event.active.id)) ?? null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveOrder(null);
+    const { active, over } = event;
+    if (!over) return;
+    const order = orders.find((o) => o.id === String(active.id));
+    const newStatus = String(over.id);
+    if (!order || order.status === newStatus) return;
+    updateStatus(order.id, newStatus);
   };
 
   const remove = async (id: string) => {
@@ -247,11 +463,45 @@ function PedidosPage() {
   };
 
   const handleReady = (o: Order) => {
-    updateStatus(o.id, "pronto");
+    updateStatus(o.id, "aguardando_entrega");
     window.open(waLink(o.customer_phone, buildReadyMsg(o)), "_blank");
   };
 
+  const handleDispatch = (o: Order) => {
+    updateStatus(o.id, "na_rua");
+    if (motoboyWhatsapp) {
+      window.open(waLink(motoboyWhatsapp, buildMotoboyMsg(o)), "_blank");
+    } else {
+      toast.error("Cadastre o WhatsApp do motoboy em Configurações.");
+    }
+  };
+
   const handleDelivered = (o: Order) => updateStatus(o.id, "entregue");
+
+  const togglePosVenda = async (o: Order) => {
+    const pos_venda_feito = !o.pos_venda_feito;
+    setOrders((prev) => prev.map((x) => (x.id === o.id ? { ...x, pos_venda_feito } : x)));
+    const { error } = await (supabase
+      .from("orders" as never)
+      .update({ pos_venda_feito } as never)
+      .eq("id", o.id));
+    if (error) {
+      toast.error("Erro: " + error.message);
+      load();
+    }
+  };
+
+  const cardHandlers: CardHandlers = {
+    now,
+    onOpenDetail: setDetail,
+    onAccept: handleAccept,
+    onReject: handleReject,
+    onReady: handleReady,
+    onDispatch: handleDispatch,
+    onDelivered: handleDelivered,
+    onTogglePosVenda: togglePosVenda,
+    onRemove: remove,
+  };
 
   return (
     <div>
@@ -265,7 +515,7 @@ function PedidosPage() {
         <div>
           <h1 className="font-display text-3xl">Pedidos</h1>
           <p className="text-sm text-muted-foreground">
-            Painel em tempo real. Toque no card para detalhes.
+            Painel em tempo real. Toque no card para detalhes ou arraste entre as colunas.
           </p>
         </div>
         <div className="text-xs text-muted-foreground">
@@ -277,121 +527,20 @@ function PedidosPage() {
         <p className="text-sm text-muted-foreground">Carregando...</p>
       ) : (
         <div className="-mx-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
-          <div className="flex min-w-max gap-3 sm:grid sm:min-w-0 sm:grid-cols-2 lg:grid-cols-4">
-            {COLUMNS.map((col) => {
-              const list = grouped[col.id] ?? [];
-              return (
-                <section
-                  key={col.id}
-                  className="flex w-[280px] flex-col rounded-2xl shadow-sm sm:w-auto"
-                  style={{ backgroundColor: col.bg }}
-                >
-                  <div
-                    className="flex items-center justify-between rounded-t-2xl px-3 py-2 text-sm font-semibold"
-                    style={{ backgroundColor: col.headerBg, color: col.headerText }}
-                  >
-                    <span>
-                      {col.emoji} {col.title}
-                    </span>
-                    <span className="rounded-full bg-white/30 px-2 py-0.5 text-xs">
-                      {list.length}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-2 p-2">
-                    {list.length === 0 ? (
-                      <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-                        Vazio
-                      </p>
-                    ) : (
-                      list.map((o) => (
-                        <article
-                          key={o.id}
-                          onClick={() => setDetail(o)}
-                          className="cursor-pointer rounded-xl border border-black/5 bg-white p-3 shadow-sm transition-all hover:shadow-md active:scale-[0.99]"
-                        >
-                          <div className="flex items-baseline justify-between gap-2">
-                            <p className="font-bold text-foreground">#{o.order_number}</p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {timeAgo(o.created_at, now)}
-                            </p>
-                          </div>
-                          <p className="mt-0.5 truncate text-sm text-foreground">
-                            {o.customer_name}{" "}
-                            <span className="text-xs text-muted-foreground">
-                              · {formatTime(o.created_at)}
-                            </span>
-                          </p>
-                          <p className="mt-1 truncate text-xs text-muted-foreground">
-                            {o.delivery_mode === "delivery"
-                              ? o.neighborhood ?? "Entrega"
-                              : "Retirada"}{" "}
-                            · {o.payment_method === "pix" ? "PIX" : "Maquininha"}
-                          </p>
-                          <p className="mt-1 font-display text-lg text-primary">
-                            {brl(Number(o.total))}
-                          </p>
-
-                          <div
-                            className="mt-2 flex flex-wrap gap-1.5"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <a
-                              href={waLink(o.customer_phone, `Oi ${o.customer_name.split(" ")[0]}! Sobre o pedido #${o.order_number} 💜`)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-1 text-[11px] font-medium text-green-800 hover:bg-green-200"
-                            >
-                              <MessageCircle className="h-3 w-3" /> WhatsApp
-                            </a>
-
-                            {col.id === "novo" && (
-                              <>
-                                <button
-                                  onClick={() => handleAccept(o)}
-                                  className="inline-flex items-center gap-1 rounded-md bg-green-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-green-700"
-                                >
-                                  <Check className="h-3 w-3" /> Aceitar
-                                </button>
-                                <button
-                                  onClick={() => handleReject(o)}
-                                  className="inline-flex items-center gap-1 rounded-md bg-red-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-red-700"
-                                >
-                                  <Ban className="h-3 w-3" /> Recusar
-                                </button>
-                              </>
-                            )}
-                            {col.id === "em_producao" && (
-                              <button
-                                onClick={() => handleReady(o)}
-                                className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-blue-700"
-                              >
-                                <Check className="h-3 w-3" /> Pronto
-                              </button>
-                            )}
-                            {col.id === "pronto" && (
-                              <button
-                                onClick={() => handleDelivered(o)}
-                                className="inline-flex items-center gap-1 rounded-md bg-gray-700 px-2 py-1 text-[11px] font-semibold text-white hover:bg-gray-800"
-                              >
-                                <Check className="h-3 w-3" /> Entregue
-                              </button>
-                            )}
-                            <button
-                              onClick={() => remove(o.id)}
-                              className="ml-auto rounded-md p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
-                              aria-label="Excluir"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </article>
-                      ))
-                    )}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
+          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+            <div className="flex min-w-max gap-3 sm:grid sm:min-w-0 sm:grid-cols-2 lg:grid-cols-5">
+              {COLUMNS.map((col) => (
+                <KanbanColumn key={col.id} col={col} orders={grouped[col.id] ?? []} h={cardHandlers} />
+              ))}
+            </div>
+            <DragOverlay>
+              {activeOrder ? (
+                <article className="w-[280px] rounded-xl border border-black/5 bg-white p-3 shadow-2xl">
+                  <OrderCardBody order={activeOrder} colId={activeOrder.status} h={cardHandlers} />
+                </article>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         </div>
       )}
 

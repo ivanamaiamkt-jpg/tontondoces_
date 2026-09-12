@@ -10,6 +10,7 @@ export const Route = createFileRoute("/admin/configuracoes")({
 
 const FIELDS = [
   { key: "whatsapp", label: "WhatsApp da loja", placeholder: "5511999999999", help: "Só números, com código do país (55) e DDD." },
+  { key: "motoboy_whatsapp", label: "WhatsApp do motoboy", placeholder: "5515998244807", help: "Só números, com código do país (55) e DDD. Hoje é o Alvaro." },
   { key: "pix_key", label: "Chave PIX", placeholder: "email@dominio.com" },
   { key: "store_open", label: "Loja aberta?", type: "select", options: ["true", "false"] },
   { key: "closed_message", label: "Mensagem quando fechada", placeholder: "Estamos fechados...", textarea: true },

@@ -86,7 +86,7 @@ function DashboardPage() {
           (supabase
             .from("orders" as never)
             .select("id", { count: "exact", head: true })
-            .in("status", ["novo", "em_producao", "pronto"])) as unknown as Promise<{
+            .in("status", ["novo", "em_producao", "aguardando_entrega", "na_rua"])) as unknown as Promise<{
             count: number | null;
           }>,
         ]);
@@ -137,7 +137,7 @@ function DashboardPage() {
             <StatCard
               title="Pedidos abertos"
               value={stats.pending}
-              hint="Novos / em produção / prontos"
+              hint="Novos / em produção / aguardando entrega / na rua"
               icon={TrendingUp}
             />
             <StatCard
@@ -155,7 +155,7 @@ function DashboardPage() {
                 <li className="flex items-center gap-2 text-muted-foreground">
                   <ShoppingBag className="h-4 w-4 text-primary" />
                   Veja a aba <strong className="text-foreground">Pedidos</strong> pra
-                  mover status (novo → produção → pronto → entregue).
+                  mover status (novo → produção → aguardando entrega → na rua → entregue).
                 </li>
                 <li className="flex items-center gap-2 text-muted-foreground">
                   <ShoppingCart className="h-4 w-4 text-primary" />

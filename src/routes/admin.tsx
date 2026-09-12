@@ -48,12 +48,12 @@ type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?
 const NAV: NavItem[] = [
   { to: "/admin", label: "Visão geral", icon: LayoutDashboard, exact: true },
   { to: "/admin/pedidos", label: "Pedidos", icon: ShoppingBag },
+  { to: "/admin/abandonados", label: "Abandonados", icon: ShoppingCart },
   { to: "/admin/cardapio", label: "Cardápio", icon: UtensilsCrossed },
   { to: "/admin/calculadora", label: "Calculadora", icon: Calculator },
   { to: "/admin/taxas", label: "Taxas de entrega", icon: Truck },
   { to: "/admin/financeiro", label: "Financeiro", icon: Wallet },
   { to: "/admin/clientes", label: "Clientes", icon: Users },
-  { to: "/admin/abandonados", label: "Abandonados", icon: ShoppingCart },
   { to: "/admin/configuracoes", label: "Configurações", icon: Settings },
 ];
 
