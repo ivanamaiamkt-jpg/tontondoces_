@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Check, Heart, Copy, MessageCircle, Loader2, ArrowLeft } from "lucide-react";
+import { X, Check, Heart, Copy, MessageCircle, Loader2, ArrowLeft, Car } from "lucide-react";
 import { useOrder } from "@/contexts/order-context";
 import { OWNER_WHATSAPP } from "@/lib/menu-data";
 import { brl, maskPhone, maskCep } from "@/lib/format";
-import { quoteDelivery } from "@/lib/delivery";
+import { quoteDelivery, STORE_ADDRESS, buildUberLink } from "@/lib/delivery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -553,13 +553,48 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                     </p>
                   )}
                   {fee.kind === "out" && (
-                    <div className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                      ⚠️ Fora da área de entrega. Entre em contato pelo WhatsApp.
+                    <div className="space-y-3 rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                      <p>⚠️ Fora da área de atendimento (só entregamos até 7km da loja).</p>
+
+                      <div className="rounded-lg border border-amber-200 bg-white p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Mas você pode pedir um Uber/moto até você 💜
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Copie nosso endereço e cole no app de sua preferência:
+                        </p>
+                        <p className="mt-2 rounded-lg bg-muted/60 p-2 text-sm text-foreground">
+                          {STORE_ADDRESS}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(STORE_ADDRESS);
+                              toast.success("Endereço copiado!");
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                          >
+                            <Copy className="h-3.5 w-3.5" /> Copiar endereço
+                          </button>
+                          <a
+                            href={buildUberLink(
+                              `${street}, ${number} - ${neighborhood}, ${city}${state ? "/" + state : ""}`,
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-full bg-black px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+                          >
+                            <Car className="h-3.5 w-3.5" /> Abrir no Uber
+                          </a>
+                        </div>
+                      </div>
+
                       <a
                         href={`https://wa.me/${OWNER_WHATSAPP}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-2 inline-flex items-center gap-1.5 font-semibold text-emerald-700 underline"
+                        className="inline-flex items-center gap-1.5 font-semibold text-emerald-700 underline"
                       >
                         <MessageCircle className="h-3.5 w-3.5" /> Falar no WhatsApp
                       </a>

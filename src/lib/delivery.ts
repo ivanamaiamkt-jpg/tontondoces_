@@ -1,10 +1,15 @@
-// Taxa de entrega: primeiro tenta a taxa fixa cadastrada pelo bairro
-// (tabela delivery_fees, editada em Admin > Taxas). Se o bairro não estiver
-// cadastrado, cai para a estimativa por distância (Nominatim + Haversine).
-// Origem: TonTon Doces — Sorocaba/SP.
+// Taxa de entrega, em ordem de prioridade:
+//   1. Tabela delivery_fees (Admin > Taxas) — override manual, sempre vence.
+//   2. Lista BAIRROS_7KM (varredura pré-calculada do OpenStreetMap) — cobre a
+//      grande maioria dos bairros reais de Sorocaba sem depender de rede.
+//   3. Nominatim + Haversine ao vivo — só pra endereços fora das duas acima.
+// Atendemos só até 7km da loja (Rua Pedro Lombardi, 890 — Vila Mineirão).
 import { supabase } from "@/integrations/supabase/client";
+import { BAIRROS_7KM } from "@/lib/sorocaba-bairros";
 
 const ORIGIN = { lat: -23.46732700953204, lon: -47.4625592865066 };
+export const MAX_DELIVERY_KM = 7;
+export const STORE_ADDRESS = "Rua Pedro Lombardi, 890 - Vila Mineirão, Sorocaba - SP, 18076-520";
 
 type NominatimResult = { lat: string; lon: string };
 
@@ -14,6 +19,13 @@ function normalizeNeighborhood(s: string) {
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function getFeeFromSweep(neighborhood: string): { fee: number; km: number } | null {
+  const target = normalizeNeighborhood(neighborhood);
+  if (!target) return null;
+  const match = BAIRROS_7KM.find((b) => normalizeNeighborhood(b.name) === target);
+  return match ? { fee: match.fee, km: match.km } : null;
 }
 
 async function getFeeByNeighborhood(neighborhood: string): Promise<number | null> {
@@ -60,10 +72,21 @@ function feeForKm(km: number): number | "out" {
   if (k <= 2) return 0;
   if (k <= 4) return 3;
   if (k === 5) return 4;
-  if (k <= 7) return 6;
-  if (k === 8) return 7;
-  if (k <= 10) return 12;
+  if (k <= MAX_DELIVERY_KM) return 6;
   return "out";
+}
+
+export function buildUberLink(dropoffAddress?: string): string {
+  const params = new URLSearchParams({
+    action: "setPickup",
+    "pickup[formatted_address]": STORE_ADDRESS,
+    "pickup[latitude]": String(ORIGIN.lat),
+    "pickup[longitude]": String(ORIGIN.lon),
+  });
+  if (dropoffAddress && dropoffAddress.trim()) {
+    params.set("dropoff[formatted_address]", dropoffAddress.trim());
+  }
+  return `https://m.uber.com/ul/?${params.toString()}`;
 }
 
 export type DeliveryQuote =
@@ -82,6 +105,11 @@ export async function quoteDelivery(input: {
   const bairroFee = await getFeeByNeighborhood(neighborhood);
   if (bairroFee !== null) {
     return { ok: true, fee: bairroFee, distanceKm: null, source: "bairro" };
+  }
+
+  const sweep = getFeeFromSweep(neighborhood);
+  if (sweep !== null) {
+    return { ok: true, fee: sweep.fee, distanceKm: sweep.km, source: "distancia" };
   }
 
   try {
