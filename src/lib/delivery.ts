@@ -9,6 +9,7 @@ import { BAIRROS_7KM } from "@/lib/sorocaba-bairros";
 
 const ORIGIN = { lat: -23.46732700953204, lon: -47.4625592865066 };
 export const MAX_DELIVERY_KM = 7;
+export const FEE_PER_KM = 1.1;
 export const STORE_ADDRESS = "Rua Pedro Lombardi, 890 - Vila Mineirão, Sorocaba - SP, 18076-520";
 export const STORE_NEIGHBORHOOD = "Vila Mineirão";
 
@@ -70,11 +71,8 @@ function haversineKm(
 
 function feeForKm(km: number): number | "out" {
   const k = Math.ceil(km);
-  if (k <= 2) return 0;
-  if (k <= 4) return 3;
-  if (k === 5) return 4;
-  if (k <= MAX_DELIVERY_KM) return 6;
-  return "out";
+  if (k > MAX_DELIVERY_KM) return "out";
+  return Math.round(k * FEE_PER_KM * 100) / 100;
 }
 
 export type DeliveryQuote =

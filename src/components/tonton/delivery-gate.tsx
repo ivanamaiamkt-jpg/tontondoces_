@@ -279,21 +279,11 @@ export function DeliveryGate({
                   )}
 
                   {quote.kind === "out" && (
-                    <div className="space-y-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
-                      <div>
-                        <p className="font-medium text-destructive">
-                          Fora da área de atendimento
-                        </p>
-                        <p className="mt-1 text-muted-foreground">
-                          {quote.distanceKm > 0
-                            ? `Esse endereço está a ~${quote.distanceKm.toFixed(1)} km. No momento atendemos só até ${MAX_DELIVERY_KM} km da loja, que fica no bairro ${STORE_NEIGHBORHOOD}.`
-                            : `No momento só entregamos em Sorocaba/SP, até ${MAX_DELIVERY_KM} km da loja (bairro ${STORE_NEIGHBORHOOD}).`}
-                        </p>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          Você ainda pode fazer o pedido e buscar com seu próprio Uber/moto — o
-                          endereço da loja aparece no checkout pra copiar.
-                        </p>
-                      </div>
+                    <div className="space-y-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
+                      <p className="font-medium text-destructive">
+                        ⚠️ Fora da área de entrega (bairro {STORE_NEIGHBORHOOD}, até{" "}
+                        {MAX_DELIVERY_KM}km).
+                      </p>
 
                       <a
                         href={whatsappLink()}

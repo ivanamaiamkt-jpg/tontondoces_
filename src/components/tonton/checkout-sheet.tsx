@@ -208,7 +208,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     if (!step1Valid || !step2Valid || submitting) return;
     setSubmitting(true);
     const orderId = `TT-${Date.now().toString().slice(-6)}`;
-    const outOfAreaNote = "Cliente vai buscar via Uber/moto própria (fora da área de entrega).";
+    const outOfAreaNote = "Fora da área — cliente vai pedir Uber entrega ou retirar.";
 
     try {
       await supabase.from("orders" as never).insert({
@@ -593,14 +593,10 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                     </p>
                   )}
                   {fee.kind === "out" && !acceptedOutOfArea && (
-                    <div className="space-y-3 rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                    <div className="space-y-2 rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-800">
                       <p>
-                        ⚠️ Fora da área de atendimento — só entregamos até {MAX_DELIVERY_KM}km da
-                        loja, que fica no bairro <strong>{STORE_NEIGHBORHOOD}</strong>.
-                      </p>
-                      <p className="text-xs">
-                        Você ainda pode fazer o pedido e buscar com seu próprio Uber/moto — no
-                        próximo passo a gente te dá o endereço certinho pra copiar.
+                        ⚠️ Fora da área de entrega (bairro {STORE_NEIGHBORHOOD}, até{" "}
+                        {MAX_DELIVERY_KM}km).
                       </p>
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -630,8 +626,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                   )}
                   {fee.kind === "out" && acceptedOutOfArea && (
                     <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
-                      ✓ Combinado! Você vai buscar seu pedido — o endereço da loja aparece no
-                      próximo passo.
+                      ✓ Combinado, você vai pedir um Uber entrega ou retirar.
                     </p>
                   )}
                   {fee.kind === "error" && (
@@ -718,7 +713,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                         <dt className="text-muted-foreground">Taxa de entrega</dt>
                         <dd>
                           {outOfArea
-                            ? "Você busca (Uber)"
+                            ? "Uber ou retirada"
                             : effectiveFee === 0
                               ? "Grátis"
                               : brl(effectiveFee)}
@@ -726,8 +721,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                       </div>
                       {outOfArea && (
                         <p className="text-xs text-muted-foreground">
-                          Fora da área de entrega — o endereço da loja pra você copiar aparece
-                          depois de confirmar.
+                          Endereço da loja aparece após confirmar.
                         </p>
                       )}
                       <div className="flex justify-between border-t border-border pt-2 text-base font-semibold">

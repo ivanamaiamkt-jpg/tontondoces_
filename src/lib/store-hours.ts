@@ -4,13 +4,13 @@
 export type DayHours = { open: number; close: number };
 
 export const STORE_HOURS: Record<number, DayHours> = {
-  0: { open: 11, close: 20 }, // domingo
+  0: { open: 11, close: 19 }, // domingo
   1: { open: 12, close: 22 }, // segunda
   2: { open: 12, close: 22 },
   3: { open: 12, close: 22 },
   4: { open: 12, close: 22 },
-  5: { open: 12, close: 24 }, // sexta
-  6: { open: 12, close: 24 }, // sábado
+  5: { open: 12, close: 22 }, // sexta
+  6: { open: 12, close: 22 }, // sábado
 };
 
 const DAY_NAMES = [
