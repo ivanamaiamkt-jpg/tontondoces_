@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Heart, Instagram, MessageCircle } from "lucide-react";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { CATEGORIES } from "@/lib/menu-data";
+import { getSoldOutProductIds } from "@/lib/product-availability";
 import { CategoryBanner } from "@/components/tonton/category-banner";
 import { ProductCard } from "@/components/tonton/product-card";
 import { CategoryNav } from "@/components/tonton/category-nav";
@@ -35,6 +36,12 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const { cartOpen } = useOrder();
+  const [soldOut, setSoldOut] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    getSoldOutProductIds().then(setSoldOut);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <PauseBanner />
@@ -142,7 +149,7 @@ function HomePage() {
             <LazyOnVisible eager={idx === 0} minHeight={cat.products.length * 180}>
               <div className="space-y-3">
                 {cat.products.map((p) => (
-                  <ProductCard key={p.id} product={p} />
+                  <ProductCard key={p.id} product={p} soldOut={soldOut.has(p.id)} />
                 ))}
               </div>
             </LazyOnVisible>

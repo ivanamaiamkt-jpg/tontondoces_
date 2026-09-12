@@ -97,7 +97,13 @@ function formatEventLabel(date: string, time: string) {
   });
 }
 
-export function ProductCard({ product }: { product: Product }) {
+export function ProductCard({
+  product,
+  soldOut = false,
+}: {
+  product: Product;
+  soldOut?: boolean;
+}) {
   const { addItem, ensureCustomer, setCartOpen } = useOrder();
   const [open, setOpen] = useState(false);
   const [flavor, setFlavor] = useState<string | null>(null);
@@ -132,6 +138,7 @@ export function ProductCard({ product }: { product: Product }) {
   }, [needsSchedule, eventDate, eventTime, minNotice]);
 
   const canAdd =
+    !soldOut &&
     (!needsFlavor || !!flavor) &&
     (!needsPicks || allPicksDone) &&
     (!needsSchedule || scheduleInfo.ok) &&
@@ -248,7 +255,9 @@ export function ProductCard({ product }: { product: Product }) {
 
   const handleAdd = () => {
     if (!canAdd) {
-      if (needsSchedule && !scheduleInfo.ok) {
+      if (soldOut) {
+        toast.error("Esse item está esgotado no momento 💔");
+      } else if (needsSchedule && !scheduleInfo.ok) {
         toast.error("Escolhe uma data válida pra festa 💕");
       } else {
         toast.error("Falta selecionar alguma coisa antes 💕");
@@ -272,16 +281,22 @@ export function ProductCard({ product }: { product: Product }) {
               alt={product.name}
               loading="lazy"
                   decoding="async"
-              className="h-full w-full object-cover"
+              className={`h-full w-full object-cover ${soldOut ? "grayscale opacity-60" : ""}`}
             />
           </div>
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {product.badge && (
-            <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-              {product.badge}
+          {soldOut ? (
+            <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-destructive">
+              Esgotado
             </span>
+          ) : (
+            product.badge && (
+              <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                {product.badge}
+              </span>
+            )
           )}
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-display text-base font-semibold leading-tight text-foreground sm:text-lg">
@@ -315,7 +330,11 @@ export function ProductCard({ product }: { product: Product }) {
                 )}
               </p>
             </div>
-            {!requiresChoice ? (
+            {soldOut ? (
+              <Button size="sm" disabled className="shrink-0 rounded-full">
+                Esgotado
+              </Button>
+            ) : !requiresChoice ? (
               <Button
                 onClick={handleAdd}
                 size="sm"
