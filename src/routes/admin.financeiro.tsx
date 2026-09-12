@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
-import { DollarSign, TrendingDown, TrendingUp, Save, Trash2, Plus } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Save, Trash2, Plus, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Bar,
@@ -45,6 +45,8 @@ const EXPENSE_CATEGORIES = [
   "Outros",
 ];
 
+const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
 function todayISO() {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -85,6 +87,8 @@ function FinanceiroPage() {
   const [monthExpenses, setMonthExpenses] = useState<Expense[]>([]);
   const [recentSales, setRecentSales] = useState<DailySale[]>([]);
   const [recentExpenses, setRecentExpenses] = useState<Expense[]>([]);
+  const [allSales, setAllSales] = useState<DailySale[]>([]);
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
   const [dailyOrderCounts, setDailyOrderCounts] = useState<Map<string, number>>(new Map());
   const [reportFrom, setReportFrom] = useState(() => todayISO().slice(0, 7) + "-01");
   const [reportTo, setReportTo] = useState(todayISO());
@@ -103,6 +107,7 @@ function FinanceiroPage() {
   const [expenseCategory, setExpenseCategory] = useState(EXPENSE_CATEGORIES[0]);
   const [expenseAmount, setExpenseAmount] = useState("");
   const [savingExpense, setSavingExpense] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
 
   const monthStart = useMemo(() => todayISO().slice(0, 7) + "-01", []);
 
@@ -112,36 +117,42 @@ function FinanceiroPage() {
     last14Start.setDate(last14Start.getDate() - 13);
     const last14StartIso = `${last14Start.toISOString().slice(0, 10)}T00:00:00`;
 
-    const [salesRes, expensesRes, recentSalesRes, recentExpensesRes, ordersRes] = await Promise.all([
-      (supabase
-        .from("daily_sales" as never)
-        .select("*")
-        .gte("sale_date", monthStart)) as unknown as Promise<{ data: DailySale[] | null }>,
-      (supabase
-        .from("expenses" as never)
-        .select("*")
-        .gte("expense_date", monthStart)) as unknown as Promise<{ data: Expense[] | null }>,
-      (supabase
-        .from("daily_sales" as never)
-        .select("*")
-        .order("sale_date", { ascending: false })
-        .limit(15)) as unknown as Promise<{ data: DailySale[] | null }>,
-      (supabase
-        .from("expenses" as never)
-        .select("*")
-        .order("expense_date", { ascending: false })
-        .limit(15)) as unknown as Promise<{ data: Expense[] | null }>,
-      (supabase
-        .from("orders" as never)
-        .select("id, created_at")
-        .gte("created_at", last14StartIso)) as unknown as Promise<{
-        data: { id: string; created_at: string }[] | null;
-      }>,
-    ]);
+    const [salesRes, expensesRes, recentSalesRes, recentExpensesRes, ordersRes, allSalesRes] =
+      await Promise.all([
+        (supabase
+          .from("daily_sales" as never)
+          .select("*")
+          .gte("sale_date", monthStart)) as unknown as Promise<{ data: DailySale[] | null }>,
+        (supabase
+          .from("expenses" as never)
+          .select("*")
+          .gte("expense_date", monthStart)) as unknown as Promise<{ data: Expense[] | null }>,
+        (supabase
+          .from("daily_sales" as never)
+          .select("*")
+          .order("sale_date", { ascending: false })
+          .limit(15)) as unknown as Promise<{ data: DailySale[] | null }>,
+        (supabase
+          .from("expenses" as never)
+          .select("*")
+          .order("expense_date", { ascending: false })
+          .limit(15)) as unknown as Promise<{ data: Expense[] | null }>,
+        (supabase
+          .from("orders" as never)
+          .select("id, created_at")
+          .gte("created_at", last14StartIso)) as unknown as Promise<{
+          data: { id: string; created_at: string }[] | null;
+        }>,
+        (supabase
+          .from("daily_sales" as never)
+          .select("*")
+          .order("sale_date", { ascending: true })) as unknown as Promise<{ data: DailySale[] | null }>,
+      ]);
     setMonthSales(salesRes.data ?? []);
     setMonthExpenses(expensesRes.data ?? []);
     setRecentSales(recentSalesRes.data ?? []);
     setRecentExpenses(recentExpensesRes.data ?? []);
+    setAllSales(allSalesRes.data ?? []);
 
     const counts = new Map<string, number>();
     (ordersRes.data ?? []).forEach((o) => {
@@ -219,27 +230,60 @@ function FinanceiroPage() {
     }
   };
 
-  const addExpense = async () => {
+  const deleteSale = async (date: string) => {
+    if (!confirm("Excluir o lançamento de vendas desse dia?")) return;
+    const { error } = await supabase.from("daily_sales" as never).delete().eq("sale_date", date);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Lançamento excluído");
+      loadAll();
+    }
+  };
+
+  const saveExpense = async () => {
     if (!expenseDesc.trim() || !expenseAmount || Number(expenseAmount) <= 0) {
       toast.error("Preencha descrição e valor da despesa");
       return;
     }
     setSavingExpense(true);
-    const { error } = await supabase.from("expenses" as never).insert({
+    const payload = {
       expense_date: expenseDate,
       description: expenseDesc.trim(),
       category: expenseCategory,
       amount: Number(expenseAmount),
-    } as never);
+    };
+    const { error } = editingExpenseId
+      ? await supabase
+          .from("expenses" as never)
+          .update(payload as never)
+          .eq("id", editingExpenseId)
+      : await supabase.from("expenses" as never).insert(payload as never);
     setSavingExpense(false);
     if (error) toast.error(error.message);
     else {
-      toast.success("Despesa registrada");
+      toast.success(editingExpenseId ? "Despesa atualizada" : "Despesa registrada");
       setExpenseDesc("");
       setExpenseAmount("");
+      setEditingExpenseId(null);
       loadAll();
       loadReport();
     }
+  };
+
+  const startEditExpense = (e: Expense) => {
+    setExpenseDate(e.expense_date);
+    setExpenseDesc(e.description);
+    setExpenseCategory(e.category ?? EXPENSE_CATEGORIES[0]);
+    setExpenseAmount(String(e.amount));
+    setEditingExpenseId(e.id);
+  };
+
+  const cancelEditExpense = () => {
+    setExpenseDate(todayISO());
+    setExpenseDesc("");
+    setExpenseCategory(EXPENSE_CATEGORIES[0]);
+    setExpenseAmount("");
+    setEditingExpenseId(null);
   };
 
   const removeExpense = async (id: string) => {
@@ -248,6 +292,7 @@ function FinanceiroPage() {
     if (error) toast.error(error.message);
     else {
       toast.success("Despesa removida");
+      if (editingExpenseId === id) cancelEditExpense();
       loadAll();
       loadReport();
     }
@@ -293,6 +338,36 @@ function FinanceiroPage() {
     return days;
   }, [recentSales, dailyOrderCounts]);
 
+  const monthlyTotals = useMemo(() => {
+    const map = new Map<string, number>();
+    allSales.forEach((s) => {
+      const key = s.sale_date.slice(0, 7);
+      const total = Number(s.cardapio) + Number(s.ifood) + Number(s.noventa_e_nove);
+      map.set(key, (map.get(key) ?? 0) + total);
+    });
+    return map;
+  }, [allSales]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    allSales.forEach((s) => years.add(Number(s.sale_date.slice(0, 4))));
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [allSales]);
+
+  const yearRows = useMemo(() => {
+    return MONTH_NAMES.map((name, i) => {
+      const mm = String(i + 1).padStart(2, "0");
+      const total = monthlyTotals.get(`${selectedYear}-${mm}`) ?? 0;
+      const prevTotal = monthlyTotals.get(`${selectedYear - 1}-${mm}`);
+      const growth =
+        prevTotal && prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : null;
+      return { name, total, growth };
+    });
+  }, [monthlyTotals, selectedYear]);
+
+  const yearTotal = yearRows.reduce((s, r) => s + r.total, 0);
+
   return (
     <div>
       <header className="mb-6">
@@ -317,10 +392,297 @@ function FinanceiroPage() {
             />
           </div>
 
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            {/* Vendas do dia */}
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <h2 className="font-display text-lg">Vendas do dia</h2>
+              <p className="mb-4 text-xs text-muted-foreground">
+                Cardápio já vem sugerido com os pedidos reais do site pra essa data — ajuste se
+                precisar. iFood e 99 são lançados manualmente.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Data</label>
+                  <input
+                    type="date"
+                    value={saleDate}
+                    onChange={(e) => setSaleDate(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Cardápio</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={cardapio}
+                      onChange={(e) => setCardapio(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-border bg-background px-2 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">iFood</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={ifood}
+                      onChange={(e) => setIfood(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-border bg-background px-2 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">99</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={noventaNove}
+                      onChange={(e) => setNoventaNove(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-border bg-background px-2 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Observações (opcional)
+                  </label>
+                  <input
+                    value={saleNotes}
+                    onChange={(e) => setSaleNotes(e.target.value)}
+                    placeholder="ex: evento particular, promoção..."
+                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+                <button
+                  onClick={saveSale}
+                  disabled={savingSale}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
+                >
+                  <Save className="h-4 w-4" /> Salvar vendas do dia
+                </button>
+              </div>
+
+              <div className="mt-5 border-t border-border pt-4">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Últimos lançamentos
+                </p>
+                <ul className="divide-y divide-border text-sm">
+                  {recentSales.length === 0 && (
+                    <li className="py-2 text-muted-foreground">Nenhum lançamento ainda.</li>
+                  )}
+                  {recentSales.map((s) => {
+                    const total = Number(s.cardapio) + Number(s.ifood) + Number(s.noventa_e_nove);
+                    return (
+                      <li key={s.sale_date} className="flex items-center justify-between gap-2 py-2">
+                        <div>
+                          <p>{formatDate(s.sale_date)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Cardápio {brl(Number(s.cardapio))} · iFood {brl(Number(s.ifood))} · 99{" "}
+                            {brl(Number(s.noventa_e_nove))}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{brl(total)}</span>
+                          <button
+                            onClick={() => setSaleDate(s.sale_date)}
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
+                            title="Editar"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteSale(s.sale_date)}
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            title="Excluir"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </section>
+
+            {/* Despesas */}
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <h2 className="font-display text-lg">Despesas</h2>
+              <p className="mb-4 text-xs text-muted-foreground">
+                Tudo que for comprado ou pago no dia a dia (ingredientes, embalagem, etc).
+              </p>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Data</label>
+                    <input
+                      type="date"
+                      value={expenseDate}
+                      onChange={(e) => setExpenseDate(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+                    <select
+                      value={expenseCategory}
+                      onChange={(e) => setExpenseCategory(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-border bg-background px-2 py-2 text-sm"
+                    >
+                      {EXPENSE_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Descrição</label>
+                  <input
+                    value={expenseDesc}
+                    onChange={(e) => setExpenseDesc(e.target.value)}
+                    placeholder="ex: leite condensado, caixinhas..."
+                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Valor (R$)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={expenseAmount}
+                    onChange={(e) => setExpenseAmount(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={saveExpense}
+                    disabled={savingExpense}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
+                  >
+                    {editingExpenseId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                    {editingExpenseId ? "Salvar alteração" : "Adicionar despesa"}
+                  </button>
+                  {editingExpenseId && (
+                    <button
+                      onClick={cancelEditExpense}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
+                    >
+                      <X className="h-4 w-4" /> Cancelar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-5 border-t border-border pt-4">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Últimos lançamentos
+                </p>
+                <ul className="divide-y divide-border text-sm">
+                  {recentExpenses.length === 0 && (
+                    <li className="py-2 text-muted-foreground">Nenhuma despesa ainda.</li>
+                  )}
+                  {recentExpenses.map((e) => (
+                    <li key={e.id} className="flex items-center justify-between gap-2 py-2">
+                      <div>
+                        <p>{e.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(e.expense_date)} · {e.category ?? "Sem categoria"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-destructive">
+                          −{brl(Number(e.amount))}
+                        </span>
+                        <button
+                          onClick={() => startEditExpense(e)}
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
+                          title="Editar"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => removeExpense(e.id)}
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          </div>
+
+          <section className="mt-6 rounded-2xl border border-border bg-card p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-display text-lg">Faturamento mensal por ano</h2>
+                <p className="text-xs text-muted-foreground">
+                  Pra enxergar sazonalidade e comparar o crescimento mês a mês entre os anos.
+                </p>
+              </div>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+              >
+                {availableYears.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="py-2">Mês</th>
+                    <th className="py-2 text-right">Faturamento</th>
+                    <th className="py-2 text-right">vs {selectedYear - 1}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {yearRows.map((r) => (
+                    <tr key={r.name}>
+                      <td className="py-2">{r.name}</td>
+                      <td className="py-2 text-right font-medium">
+                        {r.total > 0 ? brl(r.total) : "—"}
+                      </td>
+                      <td
+                        className={`py-2 text-right text-xs ${
+                          r.growth === null
+                            ? "text-muted-foreground"
+                            : r.growth >= 0
+                              ? "text-emerald-600"
+                              : "text-destructive"
+                        }`}
+                      >
+                        {r.growth === null ? "—" : `${r.growth > 0 ? "+" : ""}${r.growth}%`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-border font-medium">
+                    <td className="py-2">Total do ano</td>
+                    <td className="py-2 text-right">{brl(yearTotal)}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
+
           <section className="mt-6 rounded-2xl border border-border bg-card p-5">
             <h2 className="font-display text-lg">Faturamento e pedidos — últimos 14 dias</h2>
             <p className="mb-4 text-xs text-muted-foreground">
-              Faturamento vem dos lançamentos de "Vendas do dia" abaixo; pedidos são a contagem
+              Faturamento vem dos lançamentos de "Vendas do dia" acima; pedidos são a contagem
               real de pedidos feitos pelo cardápio online.
             </p>
             <div className="h-64 w-full">
@@ -423,200 +785,6 @@ function FinanceiroPage() {
               </div>
             )}
           </section>
-
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            {/* Vendas do dia */}
-            <section className="rounded-2xl border border-border bg-card p-5">
-              <h2 className="font-display text-lg">Vendas do dia</h2>
-              <p className="mb-4 text-xs text-muted-foreground">
-                Cardápio já vem sugerido com os pedidos reais do site pra essa data — ajuste se
-                precisar. iFood e 99 são lançados manualmente.
-              </p>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Data</label>
-                  <input
-                    type="date"
-                    value={saleDate}
-                    onChange={(e) => setSaleDate(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Cardápio</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={cardapio}
-                      onChange={(e) => setCardapio(e.target.value)}
-                      className="mt-1 w-full rounded-md border border-border bg-background px-2 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">iFood</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={ifood}
-                      onChange={(e) => setIfood(e.target.value)}
-                      className="mt-1 w-full rounded-md border border-border bg-background px-2 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">99</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={noventaNove}
-                      onChange={(e) => setNoventaNove(e.target.value)}
-                      className="mt-1 w-full rounded-md border border-border bg-background px-2 py-2 text-sm"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Observações (opcional)
-                  </label>
-                  <input
-                    value={saleNotes}
-                    onChange={(e) => setSaleNotes(e.target.value)}
-                    placeholder="ex: evento particular, promoção..."
-                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  />
-                </div>
-                <button
-                  onClick={saveSale}
-                  disabled={savingSale}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
-                >
-                  <Save className="h-4 w-4" /> Salvar vendas do dia
-                </button>
-              </div>
-
-              <div className="mt-5 border-t border-border pt-4">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Últimos lançamentos
-                </p>
-                <ul className="divide-y divide-border text-sm">
-                  {recentSales.length === 0 && (
-                    <li className="py-2 text-muted-foreground">Nenhum lançamento ainda.</li>
-                  )}
-                  {recentSales.map((s) => {
-                    const total = Number(s.cardapio) + Number(s.ifood) + Number(s.noventa_e_nove);
-                    return (
-                      <li key={s.sale_date} className="flex items-center justify-between py-2">
-                        <button
-                          onClick={() => setSaleDate(s.sale_date)}
-                          className="text-left hover:text-primary"
-                        >
-                          <p>{formatDate(s.sale_date)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Cardápio {brl(Number(s.cardapio))} · iFood {brl(Number(s.ifood))} · 99{" "}
-                            {brl(Number(s.noventa_e_nove))}
-                          </p>
-                        </button>
-                        <span className="font-medium">{brl(total)}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </section>
-
-            {/* Despesas */}
-            <section className="rounded-2xl border border-border bg-card p-5">
-              <h2 className="font-display text-lg">Despesas</h2>
-              <p className="mb-4 text-xs text-muted-foreground">
-                Tudo que for comprado ou pago no dia a dia (ingredientes, embalagem, etc).
-              </p>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Data</label>
-                    <input
-                      type="date"
-                      value={expenseDate}
-                      onChange={(e) => setExpenseDate(e.target.value)}
-                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Categoria</label>
-                    <select
-                      value={expenseCategory}
-                      onChange={(e) => setExpenseCategory(e.target.value)}
-                      className="mt-1 w-full rounded-md border border-border bg-background px-2 py-2 text-sm"
-                    >
-                      {EXPENSE_CATEGORIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Descrição</label>
-                  <input
-                    value={expenseDesc}
-                    onChange={(e) => setExpenseDesc(e.target.value)}
-                    placeholder="ex: leite condensado, caixinhas..."
-                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Valor (R$)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={expenseAmount}
-                    onChange={(e) => setExpenseAmount(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  />
-                </div>
-                <button
-                  onClick={addExpense}
-                  disabled={savingExpense}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
-                >
-                  <Plus className="h-4 w-4" /> Adicionar despesa
-                </button>
-              </div>
-
-              <div className="mt-5 border-t border-border pt-4">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Últimos lançamentos
-                </p>
-                <ul className="divide-y divide-border text-sm">
-                  {recentExpenses.length === 0 && (
-                    <li className="py-2 text-muted-foreground">Nenhuma despesa ainda.</li>
-                  )}
-                  {recentExpenses.map((e) => (
-                    <li key={e.id} className="flex items-center justify-between gap-2 py-2">
-                      <div>
-                        <p>{e.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(e.expense_date)} · {e.category ?? "Sem categoria"}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-destructive">
-                          −{brl(Number(e.amount))}
-                        </span>
-                        <button
-                          onClick={() => removeExpense(e.id)}
-                          className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </section>
-          </div>
         </>
       )}
     </div>
