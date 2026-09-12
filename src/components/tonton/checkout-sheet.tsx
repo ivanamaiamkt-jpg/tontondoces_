@@ -743,14 +743,16 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
 
             <div className="border-t border-border bg-card p-5">
               {step < 3 ? (
-                <Button
-                  onClick={goNext}
-                  disabled={(step === 1 && !step1Valid) || (step === 2 && !step2Valid)}
-                  size="lg"
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary-glow"
-                >
-                  Continuar
-                </Button>
+                !(step === 2 && outOfArea && !acceptedOutOfArea) && (
+                  <Button
+                    onClick={goNext}
+                    disabled={(step === 1 && !step1Valid) || (step === 2 && !step2Valid)}
+                    size="lg"
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary-glow"
+                  >
+                    Continuar
+                  </Button>
+                )
               ) : (
                 <>
                   {!storeStatus.open && (
