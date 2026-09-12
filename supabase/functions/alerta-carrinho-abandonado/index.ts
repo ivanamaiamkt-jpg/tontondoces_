@@ -9,10 +9,11 @@ const corsHeaders = {
 const ALERT_TO = "diretorios.tonton@gmail.com";
 
 // WhatsApp via CallMeBot (api.callmebot.com) — grátis, pensado pra notificação pessoal.
-// Configure CALLMEBOT_PHONE (número da dona, com DDI, ex: 5515999999999) e
-// CALLMEBOT_APIKEY (recebido ao ativar o bot) como secrets da function.
-async function sendWhatsAppAlert(text: string): Promise<boolean> {
-  const phone = Deno.env.get("CALLMEBOT_PHONE");
+// Número: lido de store_settings (chave "whatsapp", a mesma da tela Configurações),
+// com CALLMEBOT_PHONE como fallback se essa configuração estiver vazia.
+// CALLMEBOT_APIKEY (recebido ao ativar o bot com esse número) continua sendo secret da function.
+async function sendWhatsAppAlert(text: string, phoneOverride: string | null): Promise<boolean> {
+  const phone = phoneOverride || Deno.env.get("CALLMEBOT_PHONE");
   const apikey = Deno.env.get("CALLMEBOT_APIKEY");
   if (!phone || !apikey) return false;
   try {
@@ -38,6 +39,13 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+
+    const { data: settingRow } = await supabase
+      .from("store_settings")
+      .select("value")
+      .eq("key", "whatsapp")
+      .maybeSingle();
+    const ownerPhone: string | null = settingRow?.value || null;
 
     const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const { data: carts, error } = await supabase
@@ -113,7 +121,7 @@ Deno.serve(async (req) => {
 
       const subject = `🛒 ${nome} deixou um carrinho abandonado — TonTon Doces`;
 
-      const whatsappOk = await sendWhatsAppAlert(ownerAlertMsg);
+      const whatsappOk = await sendWhatsAppAlert(ownerAlertMsg, ownerPhone);
 
       let emailOk = false;
       if (RESEND_API_KEY) {
