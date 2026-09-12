@@ -4,6 +4,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
 import { DollarSign, TrendingDown, TrendingUp, Save, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  ComposedChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 export const Route = createFileRoute("/admin/financeiro")({
   component: FinanceiroPage,
@@ -74,6 +85,10 @@ function FinanceiroPage() {
   const [monthExpenses, setMonthExpenses] = useState<Expense[]>([]);
   const [recentSales, setRecentSales] = useState<DailySale[]>([]);
   const [recentExpenses, setRecentExpenses] = useState<Expense[]>([]);
+  const [dailyOrderCounts, setDailyOrderCounts] = useState<Map<string, number>>(new Map());
+  const [reportFrom, setReportFrom] = useState(() => todayISO().slice(0, 7) + "-01");
+  const [reportTo, setReportTo] = useState(todayISO());
+  const [reportExpenses, setReportExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [saleDate, setSaleDate] = useState(todayISO());
@@ -93,7 +108,11 @@ function FinanceiroPage() {
 
   const loadAll = async () => {
     setLoading(true);
-    const [salesRes, expensesRes, recentSalesRes, recentExpensesRes] = await Promise.all([
+    const last14Start = new Date();
+    last14Start.setDate(last14Start.getDate() - 13);
+    const last14StartIso = `${last14Start.toISOString().slice(0, 10)}T00:00:00`;
+
+    const [salesRes, expensesRes, recentSalesRes, recentExpensesRes, ordersRes] = await Promise.all([
       (supabase
         .from("daily_sales" as never)
         .select("*")
@@ -112,13 +131,41 @@ function FinanceiroPage() {
         .select("*")
         .order("expense_date", { ascending: false })
         .limit(15)) as unknown as Promise<{ data: Expense[] | null }>,
+      (supabase
+        .from("orders" as never)
+        .select("id, created_at")
+        .gte("created_at", last14StartIso)) as unknown as Promise<{
+        data: { id: string; created_at: string }[] | null;
+      }>,
     ]);
     setMonthSales(salesRes.data ?? []);
     setMonthExpenses(expensesRes.data ?? []);
     setRecentSales(recentSalesRes.data ?? []);
     setRecentExpenses(recentExpensesRes.data ?? []);
+
+    const counts = new Map<string, number>();
+    (ordersRes.data ?? []).forEach((o) => {
+      const day = o.created_at.slice(0, 10);
+      counts.set(day, (counts.get(day) ?? 0) + 1);
+    });
+    setDailyOrderCounts(counts);
+
     setLoading(false);
   };
+
+  const loadReport = async () => {
+    const { data } = (await supabase
+      .from("expenses" as never)
+      .select("*")
+      .gte("expense_date", reportFrom)
+      .lte("expense_date", reportTo)) as unknown as { data: Expense[] | null };
+    setReportExpenses(data ?? []);
+  };
+
+  useEffect(() => {
+    loadReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     loadAll();
@@ -191,6 +238,7 @@ function FinanceiroPage() {
       setExpenseDesc("");
       setExpenseAmount("");
       loadAll();
+      loadReport();
     }
   };
 
@@ -201,6 +249,7 @@ function FinanceiroPage() {
     else {
       toast.success("Despesa removida");
       loadAll();
+      loadReport();
     }
   };
 
@@ -210,6 +259,39 @@ function FinanceiroPage() {
   );
   const monthSaidas = monthExpenses.reduce((s, r) => s + Number(r.amount), 0);
   const monthSaldo = monthEntradas - monthSaidas;
+
+  const expensesByCategory = useMemo(() => {
+    const map = new Map<string, number>();
+    reportExpenses.forEach((e) => {
+      const cat = e.category ?? "Sem categoria";
+      map.set(cat, (map.get(cat) ?? 0) + Number(e.amount));
+    });
+    return Array.from(map.entries())
+      .map(([category, total]) => ({ category, total }))
+      .sort((a, b) => b.total - a.total);
+  }, [reportExpenses]);
+
+  const reportTotal = expensesByCategory.reduce((s, r) => s + r.total, 0);
+
+  const dailyChartData = useMemo(() => {
+    const days: { date: string; label: string; faturamento: number; pedidos: number }[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const iso = d.toISOString().slice(0, 10);
+      const sale = recentSales.find((s) => s.sale_date === iso);
+      const faturamento = sale
+        ? Number(sale.cardapio) + Number(sale.ifood) + Number(sale.noventa_e_nove)
+        : 0;
+      days.push({
+        date: iso,
+        label: iso.slice(8, 10) + "/" + iso.slice(5, 7),
+        faturamento,
+        pedidos: dailyOrderCounts.get(iso) ?? 0,
+      });
+    }
+    return days;
+  }, [recentSales, dailyOrderCounts]);
 
   return (
     <div>
@@ -234,6 +316,113 @@ function FinanceiroPage() {
               tone={monthSaldo >= 0 ? "neutral" : "down"}
             />
           </div>
+
+          <section className="mt-6 rounded-2xl border border-border bg-card p-5">
+            <h2 className="font-display text-lg">Faturamento e pedidos — últimos 14 dias</h2>
+            <p className="mb-4 text-xs text-muted-foreground">
+              Faturamento vem dos lançamentos de "Vendas do dia" abaixo; pedidos são a contagem
+              real de pedidos feitos pelo cardápio online.
+            </p>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={dailyChartData} margin={{ left: -20, right: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip
+                    formatter={(value: number, name: string) =>
+                      name === "faturamento" ? brl(value) : value
+                    }
+                    labelFormatter={(label) => `Dia ${label}`}
+                  />
+                  <Bar yAxisId="left" dataKey="faturamento" name="Faturamento" fill="#5c1f5c" radius={[4, 4, 0, 0]} />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="pedidos"
+                    name="Pedidos"
+                    stroke="#d4a017"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+
+          <section className="mt-6 rounded-2xl border border-border bg-card p-5">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="font-display text-lg">Relatório de despesas por categoria</h2>
+                <p className="text-xs text-muted-foreground">
+                  Total no período: <strong className="text-foreground">{brl(reportTotal)}</strong>
+                </p>
+              </div>
+              <div className="flex items-end gap-2">
+                <label className="text-xs">
+                  <span className="block text-muted-foreground">De</span>
+                  <input
+                    type="date"
+                    value={reportFrom}
+                    onChange={(e) => setReportFrom(e.target.value)}
+                    className="mt-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                  />
+                </label>
+                <label className="text-xs">
+                  <span className="block text-muted-foreground">Até</span>
+                  <input
+                    type="date"
+                    value={reportTo}
+                    onChange={(e) => setReportTo(e.target.value)}
+                    className="mt-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                  />
+                </label>
+                <button
+                  onClick={loadReport}
+                  className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground"
+                >
+                  Aplicar
+                </button>
+              </div>
+            </div>
+
+            {expensesByCategory.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma despesa nesse período.</p>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={expensesByCategory} layout="vertical" margin={{ left: 8, right: 16 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis type="number" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        type="category"
+                        dataKey="category"
+                        width={120}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip formatter={(value: number) => brl(value)} />
+                      <Bar dataKey="total" fill="#5c1f5c" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <ul className="divide-y divide-border text-sm">
+                  {expensesByCategory.map((r) => (
+                    <li key={r.category} className="flex items-center justify-between py-2">
+                      <span>{r.category}</span>
+                      <span className="flex items-center gap-2">
+                        <span className="font-medium">{brl(r.total)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {reportTotal > 0 ? Math.round((r.total / reportTotal) * 100) : 0}%
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
             {/* Vendas do dia */}
