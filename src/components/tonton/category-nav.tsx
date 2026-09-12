@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { CATEGORIES } from "@/lib/menu-data";
+import { CATEGORIES, type Category } from "@/lib/menu-data";
 
-export function CategoryNav() {
-  const [activeId, setActiveId] = useState<string>(CATEGORIES[0]?.id ?? "");
+export function CategoryNav({ categories = CATEGORIES }: { categories?: Category[] }) {
+  const [activeId, setActiveId] = useState<string>(categories[0]?.id ?? "");
   const navRef = useRef<HTMLDivElement>(null);
 
 
@@ -25,14 +25,15 @@ export function CategoryNav() {
       },
     );
 
-    CATEGORIES.forEach((cat) => {
+    categories.forEach((cat) => {
       const el = document.getElementById(`cat-${cat.id}`);
       if (el) observer.observe(el);
     });
     observers.push(observer);
 
     return () => observers.forEach((o) => o.disconnect());
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories]);
 
   // Auto-scroll horizontal do nav pra manter o item ativo visível
   useEffect(() => {
@@ -66,7 +67,7 @@ export function CategoryNav() {
         ref={navRef}
         className="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {CATEGORIES.map((cat) => {
+        {categories.map((cat) => {
           const active = cat.id === activeId;
           return (
             <a

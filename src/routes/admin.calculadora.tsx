@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUnifiedProductList } from "@/lib/menu-overrides";
 import { brl } from "@/lib/format";
 import { Plus, Trash2, Save, Calculator } from "lucide-react";
 import { toast } from "sonner";
@@ -20,8 +21,8 @@ type Product = {
   id: string;
   name: string;
   price: number;
-  extra_cost: number | null;
 };
+type ExtraCostRow = { product_id: string; extra_cost: number };
 type Recipe = {
   id: string;
   product_id: string;
@@ -33,26 +34,28 @@ function CalculadoraPage() {
   const [tab, setTab] = useState<"ingredientes" | "receitas">("ingredientes");
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [extraCosts, setExtraCosts] = useState<Map<string, number>>(new Map());
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [newIng, setNewIng] = useState({ name: "", unit: "g", package_size: 0, package_price: 0 });
   const [selectedProduct, setSelectedProduct] = useState<string>("");
 
   const load = async () => {
-    const [ingsRes, prodsRes, recRes] = await Promise.all([
+    const [ingsRes, prodsList, extraCostsRes, recRes] = await Promise.all([
       (supabase
         .from("ingredients" as never)
         .select("*")
         .order("name")) as unknown as Promise<{ data: Ingredient[] | null }>,
+      getUnifiedProductList(),
       (supabase
-        .from("menu_products" as never)
-        .select("id,name,price,extra_cost")
-        .order("name")) as unknown as Promise<{ data: Product[] | null }>,
+        .from("product_extra_costs" as never)
+        .select("*")) as unknown as Promise<{ data: ExtraCostRow[] | null }>,
       (supabase
         .from("product_recipes" as never)
         .select("*")) as unknown as Promise<{ data: Recipe[] | null }>,
     ]);
     setIngredients(ingsRes.data ?? []);
-    setProducts(prodsRes.data ?? []);
+    setProducts([...prodsList].sort((a, b) => a.name.localeCompare(b.name)));
+    setExtraCosts(new Map((extraCostsRes.data ?? []).map((r) => [r.product_id, Number(r.extra_cost)])));
     setRecipes(recRes.data ?? []);
   };
 
@@ -88,7 +91,7 @@ function CalculadoraPage() {
 
   const cost = useMemo(() => {
     if (!product) return 0;
-    let total = Number(product.extra_cost ?? 0);
+    let total = extraCosts.get(product.id) ?? 0;
     productRecipes.forEach((r) => {
       const ing = ingredients.find((i) => i.id === r.ingredient_id);
       if (!ing) return;
@@ -96,7 +99,7 @@ function CalculadoraPage() {
       total += unitCost * r.quantity_per_unit;
     });
     return total;
-  }, [productRecipes, ingredients, product]);
+  }, [productRecipes, ingredients, product, extraCosts]);
 
   const margin = product ? Number(product.price) - cost : 0;
   const marginPct = product && Number(product.price) > 0 ? (margin / Number(product.price)) * 100 : 0;
@@ -132,9 +135,10 @@ function CalculadoraPage() {
   const updateExtraCost = async (value: number) => {
     if (!product) return;
     const { error } = await (supabase
-      .from("menu_products" as never)
-      .update({ extra_cost: value } as never)
-      .eq("id", product.id));
+      .from("product_extra_costs" as never)
+      .upsert({ product_id: product.id, extra_cost: value } as never, {
+        onConflict: "product_id",
+      } as never));
     if (error) toast.error(error.message);
     else load();
   };
@@ -323,9 +327,10 @@ function CalculadoraPage() {
                 <label className="text-sm">
                   Custo extra (mão-de-obra, embalagem) por unidade R$
                   <input
+                    key={product.id}
                     type="number"
                     step="0.01"
-                    defaultValue={Number(product.extra_cost ?? 0)}
+                    defaultValue={extraCosts.get(product.id) ?? 0}
                     onBlur={(e) => updateExtraCost(Number(e.target.value))}
                     className="ml-2 w-24 rounded-md border border-border bg-background px-2 py-1"
                   />

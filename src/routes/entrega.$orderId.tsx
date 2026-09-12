@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
-import { CheckCircle2, Loader2, MapPin, Phone } from "lucide-react";
+import { CheckCircle2, Copy, Loader2, MapPin, Phone } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/entrega/$orderId")({
   head: () => ({
@@ -105,10 +106,19 @@ function EntregaPage() {
 
           <section>
             <p className="text-xs font-semibold uppercase text-muted-foreground">Endereço</p>
-            <p className="mt-1 flex items-start gap-1.5 text-foreground">
+            <div className="mt-1 flex items-start gap-2 rounded-xl border border-border bg-background px-3 py-2.5">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              {enderecoLine}
-            </p>
+              <p className="flex-1 text-foreground">{enderecoLine}</p>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(enderecoLine);
+                  toast.success("Endereço copiado!");
+                }}
+                className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-glow"
+              >
+                <Copy className="h-3.5 w-3.5" /> Copiar
+              </button>
+            </div>
           </section>
 
           <section>

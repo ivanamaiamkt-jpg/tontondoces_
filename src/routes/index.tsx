@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Heart, Instagram, MessageCircle } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { CATEGORIES } from "@/lib/menu-data";
+import { CATEGORIES, type Category } from "@/lib/menu-data";
 import { getSoldOutProductIds } from "@/lib/product-availability";
+import { getMergedCategories } from "@/lib/menu-overrides";
 import { CategoryBanner } from "@/components/tonton/category-banner";
 import { ProductCard } from "@/components/tonton/product-card";
 import { CategoryNav } from "@/components/tonton/category-nav";
@@ -37,9 +38,11 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const { cartOpen } = useOrder();
   const [soldOut, setSoldOut] = useState<Set<string>>(new Set());
+  const [categories, setCategories] = useState<Category[]>(CATEGORIES);
 
   useEffect(() => {
     getSoldOutProductIds().then(setSoldOut);
+    getMergedCategories().then(setCategories);
   }, []);
 
   return (
@@ -133,13 +136,13 @@ function HomePage() {
       </section>
 
       {/* Nav sticky de categorias */}
-      <CategoryNav />
+      <CategoryNav categories={categories} />
 
       <ReorderCard />
 
       {/* Menu */}
       <main id="cardapio" className="mx-auto max-w-5xl space-y-10 px-4 py-10 sm:py-14">
-        {CATEGORIES.map((cat, idx) => (
+        {categories.map((cat, idx) => (
           <section
             key={cat.id}
             id={`cat-${cat.id}`}
