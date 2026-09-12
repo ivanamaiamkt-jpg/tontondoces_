@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
-import { Plus, Trash2, Save } from "lucide-react";
+import { Plus, Trash2, Save, Search } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/taxas")({
@@ -16,10 +16,24 @@ type Fee = {
   is_active: boolean;
 };
 
+function normalize(s: string) {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+}
+
 function TaxasPage() {
   const [fees, setFees] = useState<Fee[]>([]);
   const [newFee, setNewFee] = useState({ neighborhood: "", fee: 0 });
   const [drafts, setDrafts] = useState<Record<string, number>>({});
+  const [search, setSearch] = useState("");
+
+  const filteredFees = useMemo(() => {
+    const q = normalize(search.trim());
+    if (!q) return fees;
+    return fees.filter((f) => normalize(f.neighborhood).includes(q));
+  }, [fees, search]);
 
   const load = async () => {
     const { data } = (await supabase
@@ -119,11 +133,26 @@ function TaxasPage() {
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-5">
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar bairro..."
+            className="w-full bg-transparent text-sm outline-none"
+          />
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {filteredFees.length}/{fees.length}
+          </span>
+        </div>
+
         {fees.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhum bairro cadastrado.</p>
+        ) : filteredFees.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum bairro encontrado pra "{search}".</p>
         ) : (
           <ul className="divide-y divide-border">
-            {fees.map((f) => (
+            {filteredFees.map((f) => (
               <li key={f.id} className="flex flex-wrap items-center gap-3 py-3">
                 <p className={`flex-1 ${!f.is_active ? "text-muted-foreground line-through" : ""}`}>
                   {f.neighborhood}
