@@ -154,12 +154,16 @@ function buildMotoboyMsg(o: Order) {
     o.delivery_mode === "delivery"
       ? `${o.street ?? ""}, ${o.number ?? ""}${o.complement ? ` — ${o.complement}` : ""} — ${o.neighborhood ?? ""} — ${o.city ?? ""}`
       : "Retirada no local";
-  const itensLine = o.items
-    .map((it) => `${it.quantity}x ${it.productName}`)
-    .join(", ");
   const pagamentoLine =
     o.payment_method === "pix" ? "PIX (já pago)" : "Maquininha (cobrar na entrega)";
-  return `🛵 Nova entrega — TonTon Doces\nCliente: ${o.customer_name} — ${o.customer_phone}\nEndereço: ${enderecoLine}\nItens: ${itensLine}\nTotal: ${brl(Number(o.total))} — Pagamento: ${pagamentoLine}`;
+  const link =
+    typeof window !== "undefined" ? `${window.location.origin}/entrega/${o.id}` : "";
+  return `🛵 Nova entrega — TonTon Doces\n${o.customer_name} — ${brl(Number(o.total))} (${pagamentoLine})\n\n📍 ${enderecoLine}\n\nVer pedido completo:\n${link}`;
+}
+
+function buildReviewMsg(o: Order) {
+  const first = o.customer_name.split(" ")[0];
+  return `Oi ${first}! Seu pedido chegou bem? 💕 Ficamos muito felizes em fazer parte do seu dia com nossos docinhos!\n\nSe tiver 1 minutinho, avalia a gente no Google? Conta muito pra nós 🙏\nhttps://g.page/r/CaMj6sbfDrdLEBM/review`;
 }
 
 type CardHandlers = {
@@ -170,7 +174,7 @@ type CardHandlers = {
   onReady: (o: Order) => void;
   onDispatch: (o: Order) => void;
   onDelivered: (o: Order) => void;
-  onTogglePosVenda: (o: Order) => void;
+  onAskReview: (o: Order) => void;
   onRemove: (id: string) => void;
 };
 
@@ -192,14 +196,16 @@ function OrderCardBody({ order: o, colId, h }: { order: Order; colId: string; h:
       <p className="mt-1 font-display text-lg text-primary">{brl(Number(o.total))}</p>
 
       <div className="mt-2 flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
-        <a
-          href={waLink(o.customer_phone, `Oi ${o.customer_name.split(" ")[0]}! Sobre o pedido #${o.order_number} 💜`)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-1 text-[11px] font-medium text-green-800 hover:bg-green-200"
-        >
-          <MessageCircle className="h-3 w-3" /> WhatsApp
-        </a>
+        {colId !== "aguardando_entrega" && (
+          <a
+            href={waLink(o.customer_phone, `Oi ${o.customer_name.split(" ")[0]}! Sobre o pedido #${o.order_number} 💜`)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-1 text-[11px] font-medium text-green-800 hover:bg-green-200"
+          >
+            <MessageCircle className="h-3 w-3" /> WhatsApp
+          </a>
+        )}
 
         {colId === "novo" && (
           <>
@@ -230,7 +236,7 @@ function OrderCardBody({ order: o, colId, h }: { order: Order; colId: string; h:
             onClick={() => h.onDispatch(o)}
             className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-amber-700"
           >
-            <MessageCircle className="h-3 w-3" /> Saiu pra entrega
+            <MessageCircle className="h-3 w-3" /> Enviar pro motoboy
           </button>
         )}
         {colId === "na_rua" && (
@@ -243,15 +249,20 @@ function OrderCardBody({ order: o, colId, h }: { order: Order; colId: string; h:
         )}
         {colId === "entregue" && (
           <button
-            onClick={() => h.onTogglePosVenda(o)}
+            onClick={() => h.onAskReview(o)}
             className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold ${
               o.pos_venda_feito
                 ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-                : "bg-muted text-muted-foreground hover:bg-muted/70"
+                : "bg-gold/20 text-chocolate hover:bg-gold/30"
             }`}
           >
-            <Check className="h-3 w-3" />
-            {o.pos_venda_feito ? "Pós-venda feito" : "Pós-venda pendente"}
+            {o.pos_venda_feito ? (
+              <>
+                <Check className="h-3 w-3" /> Avaliação pedida
+              </>
+            ) : (
+              <>⭐ Pedir avaliação</>
+            )}
           </button>
         )}
         <button
@@ -478,8 +489,7 @@ function PedidosPage() {
 
   const handleDelivered = (o: Order) => updateStatus(o.id, "entregue");
 
-  const togglePosVenda = async (o: Order) => {
-    const pos_venda_feito = !o.pos_venda_feito;
+  const markPosVenda = async (o: Order, pos_venda_feito: boolean) => {
     setOrders((prev) => prev.map((x) => (x.id === o.id ? { ...x, pos_venda_feito } : x)));
     const { error } = await (supabase
       .from("orders" as never)
@@ -491,6 +501,11 @@ function PedidosPage() {
     }
   };
 
+  const handleAskReview = (o: Order) => {
+    window.open(waLink(o.customer_phone, buildReviewMsg(o)), "_blank");
+    if (!o.pos_venda_feito) markPosVenda(o, true);
+  };
+
   const cardHandlers: CardHandlers = {
     now,
     onOpenDetail: setDetail,
@@ -499,7 +514,7 @@ function PedidosPage() {
     onReady: handleReady,
     onDispatch: handleDispatch,
     onDelivered: handleDelivered,
-    onTogglePosVenda: togglePosVenda,
+    onAskReview: handleAskReview,
     onRemove: remove,
   };
 

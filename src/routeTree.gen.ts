@@ -14,6 +14,7 @@ import { Route as MeusPedidosRouteImport } from './routes/meus-pedidos'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as EntregaOrderIdRouteImport } from './routes/entrega.$orderId'
 import { Route as AdminLoginRouteImport } from './routes/admin_.login'
 import { Route as AdminTaxasRouteImport } from './routes/admin.taxas'
 import { Route as AdminPedidosRouteImport } from './routes/admin.pedidos'
@@ -48,6 +49,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
+} as any)
+const EntregaOrderIdRoute = EntregaOrderIdRouteImport.update({
+  id: '/entrega/$orderId',
+  path: '/entrega/$orderId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/admin_/login',
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/admin/pedidos': typeof AdminPedidosRoute
   '/admin/taxas': typeof AdminTaxasRoute
   '/admin/login': typeof AdminLoginRoute
+  '/entrega/$orderId': typeof EntregaOrderIdRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/admin/pedidos': typeof AdminPedidosRoute
   '/admin/taxas': typeof AdminTaxasRoute
   '/admin/login': typeof AdminLoginRoute
+  '/entrega/$orderId': typeof EntregaOrderIdRoute
   '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/admin/pedidos': typeof AdminPedidosRoute
   '/admin/taxas': typeof AdminTaxasRoute
   '/admin_/login': typeof AdminLoginRoute
+  '/entrega/$orderId': typeof EntregaOrderIdRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos'
     | '/admin/taxas'
     | '/admin/login'
+    | '/entrega/$orderId'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -174,6 +184,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos'
     | '/admin/taxas'
     | '/admin/login'
+    | '/entrega/$orderId'
     | '/admin'
   id:
     | '__root__'
@@ -190,6 +201,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos'
     | '/admin/taxas'
     | '/admin_/login'
+    | '/entrega/$orderId'
     | '/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -199,6 +211,7 @@ export interface RootRouteChildren {
   MeusPedidosRoute: typeof MeusPedidosRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  EntregaOrderIdRoute: typeof EntregaOrderIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -237,6 +250,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/entrega/$orderId': {
+      id: '/entrega/$orderId'
+      path: '/entrega/$orderId'
+      fullPath: '/entrega/$orderId'
+      preLoaderRoute: typeof EntregaOrderIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/admin_/login': {
       id: '/admin_/login'
@@ -336,6 +356,7 @@ const rootRouteChildren: RootRouteChildren = {
   MeusPedidosRoute: MeusPedidosRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   AdminLoginRoute: AdminLoginRoute,
+  EntregaOrderIdRoute: EntregaOrderIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
