@@ -74,3 +74,18 @@ export async function markCartConverted() {
     console.error("markCartConverted error:", e);
   }
 }
+
+/** Cliente desistiu por estar fora da área de entrega — não é um abandono real,
+ * então tira do status "ativo" pra não disparar o alerta de carrinho abandonado. */
+export async function markCartOutOfArea() {
+  const session_id = typeof window !== "undefined" ? localStorage.getItem(SESSION_KEY) : null;
+  if (!session_id) return;
+  try {
+    await (supabase
+      .from("carrinhos_abandonados" as never)
+      .update({ status: "fora_area", atualizado_em: new Date().toISOString() } as never)
+      .eq("session_id", session_id));
+  } catch (e) {
+    console.error("markCartOutOfArea error:", e);
+  }
+}

@@ -9,7 +9,7 @@ export const Route = createFileRoute("/admin/abandonados")({
   component: AbandonadosPage,
 });
 
-type Status = "ativo" | "notificado" | "convertido";
+type Status = "ativo" | "notificado" | "convertido" | "fora_area";
 
 type Cart = {
   id: string;
@@ -26,12 +26,14 @@ const STATUS_LABEL: Record<Status, string> = {
   ativo: "Ativo",
   notificado: "Notificado",
   convertido: "Convertido",
+  fora_area: "Fora da área",
 };
 
 const STATUS_STYLE: Record<Status, string> = {
   ativo: "bg-amber-100 text-amber-800 border-amber-200",
   notificado: "bg-blue-100 text-blue-800 border-blue-200",
   convertido: "bg-green-100 text-green-800 border-green-200",
+  fora_area: "bg-muted text-muted-foreground border-border",
 };
 
 function AbandonadosPage() {
@@ -80,7 +82,7 @@ function AbandonadosPage() {
     return `https://wa.me/55${(c.telefone ?? "").replace(/\D/g, "")}?text=${msg}`;
   };
 
-  const tabs: Status[] = ["ativo", "notificado", "convertido"];
+  const tabs: Status[] = ["ativo", "notificado", "convertido", "fora_area"];
 
   return (
     <div>

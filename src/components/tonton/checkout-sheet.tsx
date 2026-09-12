@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Check, Heart, Copy, MessageCircle, Loader2, ArrowLeft, Car } from "lucide-react";
+import { X, Check, Heart, Copy, MessageCircle, Loader2, ArrowLeft } from "lucide-react";
 import { useOrder } from "@/contexts/order-context";
 import { OWNER_WHATSAPP } from "@/lib/menu-data";
 import { brl, maskPhone, maskCep } from "@/lib/format";
-import { quoteDelivery, STORE_ADDRESS, buildUberLink } from "@/lib/delivery";
+import { quoteDelivery, STORE_ADDRESS, STORE_NEIGHBORHOOD, MAX_DELIVERY_KM } from "@/lib/delivery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { trackPixel } from "@/lib/fbq";
-import { syncAbandonedCart, markCartConverted } from "@/lib/abandoned-cart";
+import { syncAbandonedCart, markCartConverted, markCartOutOfArea } from "@/lib/abandoned-cart";
 import { getStoreStatus } from "@/lib/store-hours";
 import { isPaused, PAUSE_WHATSAPP_NOTE } from "@/lib/pause-mode";
 
@@ -58,12 +58,14 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
   const [payment, setPayment] = useState<"pix" | "maquininha">("pix");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [acceptedOutOfArea, setAcceptedOutOfArea] = useState(false);
   const [confirmed, setConfirmed] = useState<{
     orderId: string;
     payment: "pix" | "maquininha";
     total: number;
     name: string;
     summary: string;
+    outOfArea: boolean;
   } | null>(null);
   const [sent, setSent] = useState(false);
   const [storeStatus, setStoreStatus] = useState(() => getStoreStatus());
@@ -88,6 +90,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     setCepLoading(true);
     setCepError(null);
     setFee({ kind: "idle" });
+    setAcceptedOutOfArea(false);
     try {
       const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
       const data = await res.json();
@@ -179,6 +182,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     } else {
       setCepError(null);
       setFee({ kind: "idle" });
+      setAcceptedOutOfArea(false);
     }
   };
 
@@ -187,16 +191,24 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
   const cepValid = cep.replace(/\D/g, "").length === 8 && !cepError;
   const phoneDigits = phone.replace(/\D/g, "");
   const step1Valid = name.trim().length >= 2 && phoneDigits.length >= 10;
-  const step2Valid = cepValid && number.trim().length > 0 && fee.kind === "ok";
   const outOfArea = fee.kind === "out";
+  const step2Valid =
+    cepValid && number.trim().length > 0 && (fee.kind === "ok" || (outOfArea && acceptedOutOfArea));
 
   const effectiveFee = fee.kind === "ok" ? fee.fee : 0;
   const total = subtotal + effectiveFee;
+
+  const cancelOutOfAreaCart = () => {
+    void markCartOutOfArea();
+    clearCart();
+    onClose();
+  };
 
   const handleSubmit = async () => {
     if (!step1Valid || !step2Valid || submitting) return;
     setSubmitting(true);
     const orderId = `TT-${Date.now().toString().slice(-6)}`;
+    const outOfAreaNote = "Cliente vai buscar via Uber/moto própria (fora da área de entrega).";
 
     try {
       await supabase.from("orders" as never).insert({
@@ -215,7 +227,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
         delivery_fee: effectiveFee,
         total,
         payment_method: payment,
-        notes: notes || null,
+        notes: outOfArea ? `${outOfAreaNote}${notes ? " " + notes : ""}` : notes || null,
         status: "novo",
       } as never);
     } catch (e) {
@@ -237,7 +249,9 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     });
     lines.push("");
     lines.push(`*Subtotal:* ${brl(subtotal)}`);
-    lines.push(`*Taxa de entrega:* ${brl(effectiveFee)}`);
+    lines.push(
+      `*Taxa de entrega:* ${outOfArea ? "Cliente busca (fora da área)" : brl(effectiveFee)}`,
+    );
     lines.push(
       `*Endereço:* ${street}, ${number}${complement ? ` — ${complement}` : ""} — ${neighborhood} — ${city} — CEP ${cep}`,
     );
@@ -246,6 +260,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     lines.push(
       `*Pagamento:* ${payment === "pix" ? "PIX (chave enviada após confirmação)" : "Cartão (débito ou crédito na entrega)"}`,
     );
+    if (outOfArea) lines.push(`*Observação:* ${outOfAreaNote}`);
     if (notes) lines.push(`*Observações:* ${notes}`);
     if (isPaused()) {
       lines.push("");
@@ -268,7 +283,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
       void syncAbandonedCart({ nome: name, telefone: phoneDigits, items });
     }
 
-    setConfirmed({ orderId, payment, total, name, summary });
+    setConfirmed({ orderId, payment, total, name, summary, outOfArea });
     setSent(false);
     setSubmitting(false);
   };
@@ -403,6 +418,31 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
             {confirmed.payment === "maquininha" && (
               <div className="mt-5 rounded-2xl border border-gold/40 bg-gold/10 p-4 text-left text-sm text-chocolate">
                 💳 Pagamento na entrega — débito ou crédito na maquininha.
+              </div>
+            )}
+
+            {confirmed.outOfArea && (
+              <div className="mt-5 rounded-2xl border-2 border-primary/30 bg-primary/5 p-4 text-left">
+                <p className="font-display text-sm font-semibold text-primary">
+                  🚗 Endereço da loja (pra chamar seu Uber/moto)
+                </p>
+                <div className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
+                  <code className="flex-1 text-sm font-medium text-foreground">
+                    {STORE_ADDRESS}
+                  </code>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(STORE_ADDRESS);
+                      toast.success("Endereço copiado!");
+                    }}
+                    className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-glow"
+                  >
+                    <Copy className="h-3.5 w-3.5" /> Copiar
+                  </button>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                  Cola esse endereço no app de corrida da sua preferência pra buscar seu pedido 💕
+                </p>
               </div>
             )}
 
@@ -552,53 +592,47 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                           : `✓ Taxa: ${brl(fee.fee)}`}
                     </p>
                   )}
-                  {fee.kind === "out" && (
+                  {fee.kind === "out" && !acceptedOutOfArea && (
                     <div className="space-y-3 rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-800">
-                      <p>⚠️ Fora da área de atendimento (só entregamos até 7km da loja).</p>
-
-                      <div className="rounded-lg border border-amber-200 bg-white p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Mas você pode pedir um Uber/moto até você 💜
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Copie nosso endereço e cole no app de sua preferência:
-                        </p>
-                        <p className="mt-2 rounded-lg bg-muted/60 p-2 text-sm text-foreground">
-                          {STORE_ADDRESS}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(STORE_ADDRESS);
-                              toast.success("Endereço copiado!");
-                            }}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
-                          >
-                            <Copy className="h-3.5 w-3.5" /> Copiar endereço
-                          </button>
-                          <a
-                            href={buildUberLink(
-                              `${street}, ${number} - ${neighborhood}, ${city}${state ? "/" + state : ""}`,
-                            )}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-full bg-black px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
-                          >
-                            <Car className="h-3.5 w-3.5" /> Abrir no Uber
-                          </a>
-                        </div>
+                      <p>
+                        ⚠️ Fora da área de atendimento — só entregamos até {MAX_DELIVERY_KM}km da
+                        loja, que fica no bairro <strong>{STORE_NEIGHBORHOOD}</strong>.
+                      </p>
+                      <p className="text-xs">
+                        Você ainda pode fazer o pedido e buscar com seu próprio Uber/moto — no
+                        próximo passo a gente te dá o endereço certinho pra copiar.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAcceptedOutOfArea(true)}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-glow"
+                        >
+                          Quero seguir mesmo assim
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelOutOfAreaCart}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                        >
+                          Cancelar carrinho
+                        </button>
                       </div>
-
                       <a
                         href={`https://wa.me/${OWNER_WHATSAPP}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 font-semibold text-emerald-700 underline"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 underline"
                       >
                         <MessageCircle className="h-3.5 w-3.5" /> Falar no WhatsApp
                       </a>
                     </div>
+                  )}
+                  {fee.kind === "out" && acceptedOutOfArea && (
+                    <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+                      ✓ Combinado! Você vai buscar seu pedido — o endereço da loja aparece no
+                      próximo passo.
+                    </p>
                   )}
                   {fee.kind === "error" && (
                     <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -682,8 +716,20 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                       </div>
                       <div className="flex justify-between">
                         <dt className="text-muted-foreground">Taxa de entrega</dt>
-                        <dd>{effectiveFee === 0 ? "Grátis" : brl(effectiveFee)}</dd>
+                        <dd>
+                          {outOfArea
+                            ? "Você busca (Uber)"
+                            : effectiveFee === 0
+                              ? "Grátis"
+                              : brl(effectiveFee)}
+                        </dd>
                       </div>
+                      {outOfArea && (
+                        <p className="text-xs text-muted-foreground">
+                          Fora da área de entrega — o endereço da loja pra você copiar aparece
+                          depois de confirmar.
+                        </p>
+                      )}
                       <div className="flex justify-between border-t border-border pt-2 text-base font-semibold">
                         <dt>Total</dt>
                         <dd className="font-display text-lg text-primary">{brl(total)}</dd>
@@ -705,10 +751,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
               {step < 3 ? (
                 <Button
                   onClick={goNext}
-                  disabled={
-                    (step === 1 && !step1Valid) ||
-                    (step === 2 && (!step2Valid || outOfArea))
-                  }
+                  disabled={(step === 1 && !step1Valid) || (step === 2 && !step2Valid)}
                   size="lg"
                   className="w-full bg-primary text-primary-foreground hover:bg-primary-glow"
                 >

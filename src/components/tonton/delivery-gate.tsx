@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { Loader2, MapPin, MessageCircle, Calculator, Copy, Car } from "lucide-react";
+import { Loader2, MapPin, MessageCircle, Calculator } from "lucide-react";
 import { useOrder } from "@/contexts/order-context";
 import { OWNER_WHATSAPP } from "@/lib/menu-data";
-import { quoteDelivery, STORE_ADDRESS, buildUberLink } from "@/lib/delivery";
+import { quoteDelivery, STORE_NEIGHBORHOOD, MAX_DELIVERY_KM } from "@/lib/delivery";
 import { brl, maskCep } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
 
 type ViaCepResp = {
   cep?: string;
@@ -287,44 +286,13 @@ export function DeliveryGate({
                         </p>
                         <p className="mt-1 text-muted-foreground">
                           {quote.distanceKm > 0
-                            ? `Esse endereço está a ~${quote.distanceKm.toFixed(1)} km. No momento atendemos só até 7 km da loja.`
-                            : "No momento só entregamos em Sorocaba/SP, até 7 km da loja."}
+                            ? `Esse endereço está a ~${quote.distanceKm.toFixed(1)} km. No momento atendemos só até ${MAX_DELIVERY_KM} km da loja, que fica no bairro ${STORE_NEIGHBORHOOD}.`
+                            : `No momento só entregamos em Sorocaba/SP, até ${MAX_DELIVERY_KM} km da loja (bairro ${STORE_NEIGHBORHOOD}).`}
                         </p>
-                      </div>
-
-                      <div className="rounded-xl border border-border bg-card p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Mas você pode pedir um Uber/moto até você 💜
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Você ainda pode fazer o pedido e buscar com seu próprio Uber/moto — o
+                          endereço da loja aparece no checkout pra copiar.
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Copie nosso endereço e cole no app de sua preferência pra buscar seu
-                          pedido:
-                        </p>
-                        <p className="mt-2 rounded-lg bg-muted/60 p-2 text-sm text-foreground">
-                          {STORE_ADDRESS}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(STORE_ADDRESS);
-                              toast.success("Endereço copiado!");
-                            }}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
-                          >
-                            <Copy className="h-3.5 w-3.5" /> Copiar endereço
-                          </button>
-                          <a
-                            href={buildUberLink(
-                              `${street}, ${number} - ${neighborhood}, ${city}${state ? "/" + state : ""}`,
-                            )}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-full bg-black px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
-                          >
-                            <Car className="h-3.5 w-3.5" /> Abrir no Uber
-                          </a>
-                        </div>
                       </div>
 
                       <a

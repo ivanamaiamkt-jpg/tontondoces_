@@ -10,6 +10,7 @@ import { BAIRROS_7KM } from "@/lib/sorocaba-bairros";
 const ORIGIN = { lat: -23.46732700953204, lon: -47.4625592865066 };
 export const MAX_DELIVERY_KM = 7;
 export const STORE_ADDRESS = "Rua Pedro Lombardi, 890 - Vila Mineirão, Sorocaba - SP, 18076-520";
+export const STORE_NEIGHBORHOOD = "Vila Mineirão";
 
 type NominatimResult = { lat: string; lon: string };
 
@@ -74,19 +75,6 @@ function feeForKm(km: number): number | "out" {
   if (k === 5) return 4;
   if (k <= MAX_DELIVERY_KM) return 6;
   return "out";
-}
-
-export function buildUberLink(dropoffAddress?: string): string {
-  const params = new URLSearchParams({
-    action: "setPickup",
-    "pickup[formatted_address]": STORE_ADDRESS,
-    "pickup[latitude]": String(ORIGIN.lat),
-    "pickup[longitude]": String(ORIGIN.lon),
-  });
-  if (dropoffAddress && dropoffAddress.trim()) {
-    params.set("dropoff[formatted_address]", dropoffAddress.trim());
-  }
-  return `https://m.uber.com/ul/?${params.toString()}`;
 }
 
 export type DeliveryQuote =
