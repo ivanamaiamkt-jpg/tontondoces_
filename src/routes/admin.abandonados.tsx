@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
-import { MessageCircle, CheckCircle, Bell, RotateCcw } from "lucide-react";
+import { MessageCircle, CheckCircle, Bell, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/abandonados")({
@@ -67,6 +67,16 @@ function AbandonadosPage() {
     if (error) toast.error(error.message);
     else {
       toast.success(`Marcado como ${STATUS_LABEL[status].toLowerCase()}`);
+      load();
+    }
+  };
+
+  const deleteCart = async (id: string) => {
+    if (!window.confirm("Excluir este carrinho? Não dá pra desfazer.")) return;
+    const { error } = await supabase.from("carrinhos_abandonados").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Carrinho excluído");
       load();
     }
   };
@@ -190,6 +200,12 @@ function AbandonadosPage() {
                       <CheckCircle className="h-4 w-4" /> Convertido
                     </button>
                   )}
+                  <button
+                    onClick={() => deleteCart(c.id)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm text-red-800 hover:bg-red-100"
+                  >
+                    <Trash2 className="h-4 w-4" /> Excluir
+                  </button>
                 </div>
               </li>
             );
