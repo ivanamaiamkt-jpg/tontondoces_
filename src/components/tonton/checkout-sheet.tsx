@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { trackPixel } from "@/lib/fbq";
 import { syncAbandonedCart, markCartConverted, markCartOutOfArea } from "@/lib/abandoned-cart";
+import { getStoredUtm } from "@/lib/analytics";
 import { getStoreStatus } from "@/lib/store-hours";
 import { isPaused, PAUSE_WHATSAPP_NOTE } from "@/lib/pause-mode";
 
@@ -228,6 +229,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
         payment_method: payment,
         notes: outOfArea ? `${outOfAreaNote}${notes ? " " + notes : ""}` : notes || null,
         status: "novo",
+        ...getStoredUtm(),
       } as never);
     } catch (e) {
       console.error("Erro ao salvar pedido:", e);

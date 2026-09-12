@@ -13,6 +13,7 @@ import {
   LogOut,
   Heart,
   Wallet,
+  Eye,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -53,6 +54,7 @@ const NAV: NavItem[] = [
   { to: "/admin/calculadora", label: "Calculadora", icon: Calculator },
   { to: "/admin/taxas", label: "Taxas de entrega", icon: Truck },
   { to: "/admin/financeiro", label: "Financeiro", icon: Wallet },
+  { to: "/admin/analytics", label: "Visitas", icon: Eye },
   { to: "/admin/clientes", label: "Clientes", icon: Users },
   { to: "/admin/configuracoes", label: "Configurações", icon: Settings },
 ];

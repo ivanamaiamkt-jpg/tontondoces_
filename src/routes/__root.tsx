@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import { OrderProvider } from "@/contexts/order-context";
 import { CustomerCaptureModal } from "@/components/tonton/customer-capture-modal";
 import { registerServiceWorker } from "@/lib/pwa";
+import { captureUtmFromUrl, recordVisit } from "@/lib/analytics";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -103,6 +104,8 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   useEffect(() => {
     registerServiceWorker();
+    captureUtmFromUrl();
+    void recordVisit();
   }, []);
   return (
     <OrderProvider>

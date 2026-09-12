@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { CartItem } from "@/contexts/order-context";
+import { getStoredUtm } from "@/lib/analytics";
 
 const SESSION_KEY = "tonton_session_id";
 
@@ -54,6 +55,7 @@ export async function syncAbandonedCart({ nome, telefone, items, status = "ativo
         total,
         status,
         atualizado_em: new Date().toISOString(),
+        ...getStoredUtm(),
       } as never,
       { onConflict: "session_id" } as never,
     ));

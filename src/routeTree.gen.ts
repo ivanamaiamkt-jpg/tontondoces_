@@ -23,6 +23,7 @@ import { Route as AdminConfiguracoesRouteImport } from './routes/admin.configura
 import { Route as AdminClientesRouteImport } from './routes/admin.clientes'
 import { Route as AdminCardapioRouteImport } from './routes/admin.cardapio'
 import { Route as AdminCalculadoraRouteImport } from './routes/admin.calculadora'
+import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as AdminAbandonadosRouteImport } from './routes/admin.abandonados'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -95,6 +96,11 @@ const AdminCalculadoraRoute = AdminCalculadoraRouteImport.update({
   path: '/calculadora',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAbandonadosRoute = AdminAbandonadosRouteImport.update({
   id: '/abandonados',
   path: '/abandonados',
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/meus-pedidos': typeof MeusPedidosRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/abandonados': typeof AdminAbandonadosRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/calculadora': typeof AdminCalculadoraRoute
   '/admin/cardapio': typeof AdminCardapioRoute
   '/admin/clientes': typeof AdminClientesRoute
@@ -123,6 +130,7 @@ export interface FileRoutesByTo {
   '/meus-pedidos': typeof MeusPedidosRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/abandonados': typeof AdminAbandonadosRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/calculadora': typeof AdminCalculadoraRoute
   '/admin/cardapio': typeof AdminCardapioRoute
   '/admin/clientes': typeof AdminClientesRoute
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/meus-pedidos': typeof MeusPedidosRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/abandonados': typeof AdminAbandonadosRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/calculadora': typeof AdminCalculadoraRoute
   '/admin/cardapio': typeof AdminCardapioRoute
   '/admin/clientes': typeof AdminClientesRoute
@@ -160,6 +169,7 @@ export interface FileRouteTypes {
     | '/meus-pedidos'
     | '/reset-password'
     | '/admin/abandonados'
+    | '/admin/analytics'
     | '/admin/calculadora'
     | '/admin/cardapio'
     | '/admin/clientes'
@@ -176,6 +186,7 @@ export interface FileRouteTypes {
     | '/meus-pedidos'
     | '/reset-password'
     | '/admin/abandonados'
+    | '/admin/analytics'
     | '/admin/calculadora'
     | '/admin/cardapio'
     | '/admin/clientes'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/meus-pedidos'
     | '/reset-password'
     | '/admin/abandonados'
+    | '/admin/analytics'
     | '/admin/calculadora'
     | '/admin/cardapio'
     | '/admin/clientes'
@@ -314,6 +326,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCalculadoraRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/analytics': {
+      id: '/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AdminAnalyticsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/abandonados': {
       id: '/admin/abandonados'
       path: '/abandonados'
@@ -326,6 +345,7 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminAbandonadosRoute: typeof AdminAbandonadosRoute
+  AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminCalculadoraRoute: typeof AdminCalculadoraRoute
   AdminCardapioRoute: typeof AdminCardapioRoute
   AdminClientesRoute: typeof AdminClientesRoute
@@ -338,6 +358,7 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAbandonadosRoute: AdminAbandonadosRoute,
+  AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminCalculadoraRoute: AdminCalculadoraRoute,
   AdminCardapioRoute: AdminCardapioRoute,
   AdminClientesRoute: AdminClientesRoute,
