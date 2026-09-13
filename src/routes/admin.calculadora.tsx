@@ -248,6 +248,16 @@ function CalculadoraPage() {
         </p>
       </header>
 
+      <div className="mb-4 flex items-start gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-foreground">
+        <Scale className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <p>
+          Pra montar uma receita pesando os ingredientes: vá em{" "}
+          <strong>Receitas &amp; margem</strong>, escolha o produto e clique em{" "}
+          <strong>"Passo a passo: pesar e calcular"</strong>. Não precisa cadastrar ingrediente
+          antes — o sistema cria sozinho.
+        </p>
+      </div>
+
       <div className="mb-4 flex gap-2">
         <button
           onClick={() => setTab("ingredientes")}

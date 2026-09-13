@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
-import { MessageCircle, Search } from "lucide-react";
+import { MessageCircle, Search, Eye, Trash2, X, MapPin } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/clientes")({
   component: ClientesPage,
@@ -14,31 +15,191 @@ type Customer = {
   phone: string;
   created_at: string;
 };
-type OrderSum = { customer_phone: string; total: number; created_at: string };
+
+type OrderRow = {
+  id: string;
+  order_number: string;
+  customer_phone: string;
+  total: number;
+  status: string;
+  created_at: string;
+  delivery_mode: string;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  neighborhood: string | null;
+  city: string | null;
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  novo: "Novo",
+  em_producao: "Em produção",
+  aguardando_entrega: "Aguardando entrega",
+  na_rua: "Na rua",
+  entregue: "Entregue",
+};
+
+function waLink(phone: string) {
+  return `https://wa.me/55${phone.replace(/\D/g, "")}`;
+}
+
+function formatAddress(o: OrderRow) {
+  if (o.delivery_mode !== "delivery" || !o.street) return null;
+  const parts = [
+    `${o.street}${o.number ? `, ${o.number}` : ""}`,
+    o.complement || null,
+    o.neighborhood || null,
+    o.city || null,
+  ].filter(Boolean);
+  return parts.join(" — ");
+}
+
+function CustomerDetailModal({
+  customer,
+  orders,
+  onClose,
+  onDeleted,
+}: {
+  customer: Customer;
+  orders: OrderRow[];
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const custOrders = orders
+    .filter((o) => o.customer_phone === customer.phone)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const lastAddress = custOrders.map(formatAddress).find((a) => a);
+  const totalSpent = custOrders.reduce((s, o) => s + Number(o.total), 0);
+
+  const deleteCustomer = async () => {
+    if (
+      !confirm(
+        `Remover ${customer.name} da lista de clientes? Os pedidos dele continuam salvos no histórico.`,
+      )
+    )
+      return;
+    const { error } = await supabase.from("customers" as never).delete().eq("id", customer.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Cliente removido");
+      onDeleted();
+      onClose();
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-4 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border bg-primary px-5 py-3 text-primary-foreground">
+          <div>
+            <p className="font-display text-xl">{customer.name}</p>
+            <p className="text-xs opacity-90">{customer.phone}</p>
+          </div>
+          <button onClick={onClose} className="rounded-full p-1 hover:bg-white/10">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-4 overflow-y-auto p-5 text-sm">
+          <section>
+            <p className="text-xs font-semibold uppercase text-muted-foreground">Endereço</p>
+            <p className="mt-1 flex items-start gap-1.5 text-foreground">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              {lastAddress ?? "Nenhum endereço de entrega registrado ainda (só retirada, ou sem pedidos)."}
+            </p>
+          </section>
+
+          <section className="grid grid-cols-2 gap-2">
+            <p>
+              <span className="text-muted-foreground">Pedidos:</span>{" "}
+              <strong>{custOrders.length}</strong>
+            </p>
+            <p>
+              <span className="text-muted-foreground">Total gasto:</span>{" "}
+              <strong>{brl(totalSpent)}</strong>
+            </p>
+          </section>
+
+          <section>
+            <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+              Histórico de pedidos
+            </p>
+            {custOrders.length === 0 ? (
+              <p className="text-muted-foreground">Nenhum pedido ainda.</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {custOrders.map((o) => (
+                  <li key={o.id} className="flex items-center justify-between gap-2 py-2">
+                    <div>
+                      <p className="text-foreground">
+                        #{o.order_number} ·{" "}
+                        {new Date(o.created_at).toLocaleDateString("pt-BR")}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {STATUS_LABEL[o.status] ?? o.status}
+                      </p>
+                    </div>
+                    <span className="font-medium">{brl(Number(o.total))}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+
+        <div className="flex items-center justify-between gap-2 border-t border-border p-4">
+          <button
+            onClick={deleteCustomer}
+            className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4" /> Remover cliente
+          </button>
+          <a
+            href={waLink(customer.phone)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 hover:bg-green-100"
+          >
+            <MessageCircle className="h-4 w-4" /> WhatsApp
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ClientesPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [orders, setOrders] = useState<OrderSum[]>([]);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Customer | null>(null);
+
+  const load = async () => {
+    const [cRes, oRes] = await Promise.all([
+      (supabase
+        .from("customers" as never)
+        .select("*")
+        .order("created_at", { ascending: false })) as unknown as Promise<{
+        data: Customer[] | null;
+      }>,
+      (supabase
+        .from("orders" as never)
+        .select(
+          "id,order_number,customer_phone,total,status,created_at,delivery_mode,street,number,complement,neighborhood,city",
+        )) as unknown as Promise<{ data: OrderRow[] | null }>,
+    ]);
+    setCustomers(cRes.data ?? []);
+    setOrders(oRes.data ?? []);
+  };
 
   useEffect(() => {
-    (async () => {
-      const [cRes, oRes] = await Promise.all([
-        (supabase
-          .from("customers" as never)
-          .select("*")
-          .order("created_at", { ascending: false })) as unknown as Promise<{
-          data: Customer[] | null;
-        }>,
-        (supabase
-          .from("orders" as never)
-          .select("customer_phone,total,created_at")) as unknown as Promise<{
-          data: OrderSum[] | null;
-        }>,
-      ]);
-      setCustomers(cRes.data ?? []);
-      setOrders(oRes.data ?? []);
-    })();
+    load();
   }, []);
 
   const enriched = useMemo(() => {
@@ -122,9 +283,7 @@ function ClientesPage() {
                   <td className="px-4 py-2">{c.ordersCount}</td>
                   <td className="px-4 py-2">{brl(c.totalSpent)}</td>
                   <td className="px-4 py-2 text-xs text-muted-foreground">
-                    {c.lastOrder
-                      ? c.lastOrder.toLocaleDateString("pt-BR")
-                      : "—"}
+                    {c.lastOrder ? c.lastOrder.toLocaleDateString("pt-BR") : "—"}
                   </td>
                   <td className="px-4 py-2">
                     <span
@@ -133,21 +292,38 @@ function ClientesPage() {
                       {c.status}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-right">
-                    <a
-                      href={`https://wa.me/55${c.phone.replace(/\D/g, "")}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-md border border-green-200 bg-green-50 px-2 py-1 text-xs text-green-800 hover:bg-green-100"
-                    >
-                      <MessageCircle className="h-3 w-3" /> WhatsApp
-                    </a>
+                  <td className="px-4 py-2">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => setSelected(c)}
+                        className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-xs hover:bg-muted"
+                      >
+                        <Eye className="h-3 w-3" /> Abrir
+                      </button>
+                      <a
+                        href={waLink(c.phone)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-md border border-green-200 bg-green-50 px-2 py-1 text-xs text-green-800 hover:bg-green-100"
+                      >
+                        <MessageCircle className="h-3 w-3" /> WhatsApp
+                      </a>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {selected && (
+        <CustomerDetailModal
+          customer={selected}
+          orders={orders}
+          onClose={() => setSelected(null)}
+          onDeleted={load}
+        />
       )}
     </div>
   );
