@@ -2,7 +2,19 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
-import { ShoppingBag, Users, DollarSign, TrendingUp } from "lucide-react";
+import {
+  ShoppingBag,
+  Users,
+  DollarSign,
+  TrendingUp,
+  Pencil,
+  Trash2,
+  Plus,
+  Settings2,
+  Check,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/")({
   component: DashboardPage,
@@ -18,65 +30,17 @@ type Stats = {
   pending: number;
 };
 
-type ChecklistItem = { key: string; label: string; linkTo?: string };
-type ChecklistBlock = { title: string; emoji: string; items: ChecklistItem[] };
+type ChecklistItemRow = {
+  id: string;
+  frequency: "daily" | "weekly";
+  block: string;
+  label: string;
+  link_to: string | null;
+  sort_order: number;
+};
 
-const DAILY_BLOCKS: ChecklistBlock[] = [
-  {
-    title: "Manhã",
-    emoji: "🌅",
-    items: [
-      { key: "ver-pedidos-novos", label: "Ver pedidos novos", linkTo: "/admin/pedidos" },
-      { key: "checar-compras", label: "Checar o que falta comprar pra produção de hoje" },
-      { key: "planejar-producao", label: "Planejar quanto vai produzir hoje" },
-    ],
-  },
-  {
-    title: "Durante o dia",
-    emoji: "🍰",
-    items: [
-      { key: "produzir-pedidos", label: "Produzir os pedidos" },
-      {
-        key: "atualizar-esgotados",
-        label: "Atualizar itens esgotados no cardápio, se precisar",
-        linkTo: "/admin/cardapio",
-      },
-      { key: "responder-clientes", label: "Responder clientes (WhatsApp/Instagram)" },
-      {
-        key: "despachar-pedidos",
-        label: "Despachar pedidos prontos pro motoboy",
-        linkTo: "/admin/pedidos",
-      },
-    ],
-  },
-  {
-    title: "Fechamento do dia",
-    emoji: "🌙",
-    items: [
-      { key: "lancar-vendas", label: "Lançar vendas do dia", linkTo: "/admin/financeiro" },
-      {
-        key: "pedir-avaliacao",
-        label: "Pedir avaliação de quem recebeu hoje",
-        linkTo: "/admin/pedidos",
-      },
-      { key: "post-story", label: "Fazer 1 post ou story" },
-    ],
-  },
-];
-
-const WEEKLY_ITEMS: ChecklistItem[] = [
-  {
-    key: "revisar-cardapio",
-    label: "Revisar cardápio (preços, fotos, itens parados)",
-    linkTo: "/admin/cardapio",
-  },
-  { key: "planejar-compras-semana", label: "Planejar compras da semana" },
-  {
-    key: "olhar-financeiro-semana",
-    label: "Dar uma olhada em Financeiro/Visitas da semana",
-    linkTo: "/admin/financeiro",
-  },
-];
+const DAILY_BLOCK_ORDER = ["Manhã", "Tarde", "Fechamento"];
+const BLOCK_EMOJI: Record<string, string> = { Manhã: "🌅", Tarde: "🍰", Fechamento: "🌙" };
 
 function todayKey() {
   const d = new Date();
@@ -120,76 +84,53 @@ function ProgressBar({ done, total }: { done: number; total: number }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-      <div
-        className="h-full rounded-full bg-primary transition-all"
-        style={{ width: `${pct}%` }}
-      />
+      <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
     </div>
-  );
-}
-
-function ChecklistRow({
-  item,
-  checked,
-  onToggle,
-}: {
-  item: ChecklistItem;
-  checked: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <li className="flex items-center justify-between gap-3 py-1.5">
-      <label className="flex flex-1 cursor-pointer items-start gap-2.5 text-sm">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={onToggle}
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-primary"
-        />
-        <span className={checked ? "text-muted-foreground line-through" : "text-foreground"}>
-          {item.label}
-        </span>
-      </label>
-      {item.linkTo && (
-        <Link
-          to={item.linkTo as "/admin/pedidos"}
-          className="shrink-0 whitespace-nowrap text-xs text-primary hover:underline"
-        >
-          abrir →
-        </Link>
-      )}
-    </li>
   );
 }
 
 function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
-  const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set());
+  const [items, setItems] = useState<ChecklistItemRow[]>([]);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [editMode, setEditMode] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [newItemDrafts, setNewItemDrafts] = useState<Record<string, string>>({});
 
   const dayKey = useMemo(() => todayKey(), []);
   const weekKey = useMemo(() => mondayKey(), []);
 
-  const loadChecklist = async () => {
+  const loadItems = async () => {
+    const { data } = (await supabase
+      .from("checklist_items" as never)
+      .select("*")
+      .order("sort_order")) as unknown as { data: ChecklistItemRow[] | null };
+    setItems(data ?? []);
+  };
+
+  const loadState = async () => {
     const { data } = (await supabase
       .from("checklist_state" as never)
-      .select("period_key, item_key")
+      .select("period_key, item_id")
       .in("period_key", [dayKey, weekKey])) as unknown as {
-      data: { period_key: string; item_key: string }[] | null;
+      data: { period_key: string; item_id: string }[] | null;
     };
-    setCheckedKeys(new Set((data ?? []).map((r) => `${r.period_key}:${r.item_key}`)));
+    setCheckedIds(new Set((data ?? []).map((r) => `${r.period_key}:${r.item_id}`)));
   };
 
   useEffect(() => {
-    loadChecklist();
+    loadItems();
+    loadState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const isChecked = (periodKey: string, itemKey: string) => checkedKeys.has(`${periodKey}:${itemKey}`);
+  const isChecked = (periodKey: string, itemId: string) => checkedIds.has(`${periodKey}:${itemId}`);
 
-  const toggleItem = async (periodKey: string, itemKey: string) => {
-    const id = `${periodKey}:${itemKey}`;
-    const currentlyChecked = checkedKeys.has(id);
-    setCheckedKeys((prev) => {
+  const toggleItem = async (periodKey: string, itemId: string) => {
+    const id = `${periodKey}:${itemId}`;
+    const currentlyChecked = checkedIds.has(id);
+    setCheckedIds((prev) => {
       const next = new Set(prev);
       if (currentlyChecked) next.delete(id);
       else next.add(id);
@@ -200,20 +141,76 @@ function DashboardPage() {
         .from("checklist_state" as never)
         .delete()
         .eq("period_key", periodKey)
-        .eq("item_key", itemKey);
+        .eq("item_id", itemId);
     } else {
-      await supabase
-        .from("checklist_state" as never)
-        .upsert({ period_key: periodKey, item_key: itemKey } as never);
+      await supabase.from("checklist_state" as never).upsert({ period_key: periodKey, item_id: itemId } as never);
     }
   };
 
-  const dailyTotal = DAILY_BLOCKS.reduce((s, b) => s + b.items.length, 0);
-  const dailyDone = DAILY_BLOCKS.reduce(
-    (s, b) => s + b.items.filter((it) => isChecked(dayKey, it.key)).length,
-    0,
-  );
-  const weeklyDone = WEEKLY_ITEMS.filter((it) => isChecked(weekKey, it.key)).length;
+  const startEdit = (item: ChecklistItemRow) => {
+    setEditingId(item.id);
+    setEditDraft(item.label);
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !editDraft.trim()) return;
+    const { error } = await supabase
+      .from("checklist_items" as never)
+      .update({ label: editDraft.trim() } as never)
+      .eq("id", editingId);
+    if (error) toast.error(error.message);
+    setEditingId(null);
+    loadItems();
+  };
+
+  const moveItem = async (itemId: string, newBlock: string) => {
+    const { error } = await supabase
+      .from("checklist_items" as never)
+      .update({ block: newBlock } as never)
+      .eq("id", itemId);
+    if (error) toast.error(error.message);
+    else loadItems();
+  };
+
+  const removeItem = async (itemId: string) => {
+    if (!confirm("Excluir essa tarefa da rotina?")) return;
+    const { error } = await supabase.from("checklist_items" as never).delete().eq("id", itemId);
+    if (error) toast.error(error.message);
+    else loadItems();
+  };
+
+  const addItem = async (frequency: "daily" | "weekly", block: string) => {
+    const draftKey = `${frequency}:${block}`;
+    const label = (newItemDrafts[draftKey] ?? "").trim();
+    if (!label) return;
+    const sameBlock = items.filter((i) => i.block === block);
+    const maxOrder = sameBlock.reduce((m, i) => Math.max(m, i.sort_order), 0);
+    const { error } = await supabase.from("checklist_items" as never).insert({
+      frequency,
+      block,
+      label,
+      sort_order: maxOrder + 1,
+    } as never);
+    if (error) toast.error(error.message);
+    else {
+      setNewItemDrafts((prev) => ({ ...prev, [draftKey]: "" }));
+      loadItems();
+    }
+  };
+
+  const dailyItems = items.filter((i) => i.frequency === "daily");
+  const weeklyItems = items
+    .filter((i) => i.frequency === "weekly")
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  const dailyBlocks = DAILY_BLOCK_ORDER.map((block) => ({
+    block,
+    items: dailyItems.filter((i) => i.block === block).sort((a, b) => a.sort_order - b.sort_order),
+  }));
+
+  const dailyTotal = dailyItems.length;
+  const dailyDone = dailyItems.filter((i) => isChecked(dayKey, i.id)).length;
+  const weeklyDone = weeklyItems.filter((i) => isChecked(weekKey, i.id)).length;
 
   useEffect(() => {
     (async () => {
@@ -262,10 +259,8 @@ function DashboardPage() {
           }>,
         ]);
 
-      const revenueToday =
-        ordersTodayRes.data?.reduce((s, r) => s + Number(r.total), 0) ?? 0;
-      const revenueMonth =
-        revenueMonthRes.data?.reduce((s, r) => s + Number(r.total), 0) ?? 0;
+      const revenueToday = ordersTodayRes.data?.reduce((s, r) => s + Number(r.total), 0) ?? 0;
+      const revenueMonth = revenueMonthRes.data?.reduce((s, r) => s + Number(r.total), 0) ?? 0;
 
       setStats({
         ordersToday: ordersTodayRes.count ?? 0,
@@ -279,6 +274,106 @@ function DashboardPage() {
     })();
   }, []);
 
+  function ItemRow({ item, periodKey }: { item: ChecklistItemRow; periodKey: string }) {
+    const checked = isChecked(periodKey, item.id);
+    if (editingId === item.id) {
+      return (
+        <li className="flex items-center gap-2 py-1.5">
+          <input
+            autoFocus
+            value={editDraft}
+            onChange={(e) => setEditDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && saveEdit()}
+            className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm"
+          />
+          <button onClick={saveEdit} className="rounded p-1 text-primary hover:bg-primary/10">
+            <Check className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setEditingId(null)}
+            className="rounded p-1 text-muted-foreground hover:bg-muted"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </li>
+      );
+    }
+    return (
+      <li className="flex items-center justify-between gap-2 py-1.5">
+        <label className="flex flex-1 cursor-pointer items-start gap-2.5 text-sm">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={() => toggleItem(periodKey, item.id)}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-primary"
+          />
+          <span className={checked ? "text-muted-foreground line-through" : "text-foreground"}>
+            {item.label}
+          </span>
+        </label>
+        {!editMode && item.link_to && (
+          <Link
+            to={item.link_to as "/admin/pedidos"}
+            className="shrink-0 whitespace-nowrap text-xs text-primary hover:underline"
+          >
+            abrir →
+          </Link>
+        )}
+        {editMode && (
+          <div className="flex shrink-0 items-center gap-1">
+            {item.frequency === "daily" && (
+              <select
+                value={item.block}
+                onChange={(e) => moveItem(item.id, e.target.value)}
+                className="rounded-md border border-border bg-background px-1.5 py-1 text-xs"
+              >
+                {DAILY_BLOCK_ORDER.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={() => startEdit(item)}
+              className="rounded p-1 text-muted-foreground hover:bg-muted"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => removeItem(item.id)}
+              className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+      </li>
+    );
+  }
+
+  function AddItemRow({ frequency, block }: { frequency: "daily" | "weekly"; block: string }) {
+    const draftKey = `${frequency}:${block}`;
+    return (
+      <li className="flex items-center gap-2 py-1.5">
+        <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <input
+          value={newItemDrafts[draftKey] ?? ""}
+          onChange={(e) => setNewItemDrafts((prev) => ({ ...prev, [draftKey]: e.target.value }))}
+          onKeyDown={(e) => e.key === "Enter" && addItem(frequency, block)}
+          placeholder="nova tarefa..."
+          className="flex-1 rounded-md border border-dashed border-border bg-background px-2 py-1 text-sm"
+        />
+        <button
+          onClick={() => addItem(frequency, block)}
+          className="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
+        >
+          Adicionar
+        </button>
+      </li>
+    );
+  }
+
   return (
     <div>
       <header className="mb-4">
@@ -286,12 +381,24 @@ function DashboardPage() {
       </header>
 
       <div className="mb-6 rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4">
-        <p className="font-display text-lg italic text-primary">
-          Prosperidade vem de organização.
-        </p>
+        <p className="font-display text-lg italic text-primary">Prosperidade vem de organização.</p>
         <p className="text-sm text-muted-foreground">
           Organize seu negócio e veja os milagres acontecerem.
         </p>
+      </div>
+
+      <div className="mb-3 flex justify-end">
+        <button
+          onClick={() => setEditMode((v) => !v)}
+          className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${
+            editMode
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-card text-foreground hover:bg-muted"
+          }`}
+        >
+          <Settings2 className="h-3.5 w-3.5" />
+          {editMode ? "Concluir edição" : "Editar rotina"}
+        </button>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -305,20 +412,16 @@ function DashboardPage() {
           <ProgressBar done={dailyDone} total={dailyTotal} />
 
           <div className="mt-4 space-y-4">
-            {DAILY_BLOCKS.map((block) => (
-              <div key={block.title}>
+            {dailyBlocks.map(({ block, items: blockItems }) => (
+              <div key={block}>
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {block.emoji} {block.title}
+                  {BLOCK_EMOJI[block] ?? ""} {block}
                 </p>
                 <ul className="mt-1 divide-y divide-border">
-                  {block.items.map((item) => (
-                    <ChecklistRow
-                      key={item.key}
-                      item={item}
-                      checked={isChecked(dayKey, item.key)}
-                      onToggle={() => toggleItem(dayKey, item.key)}
-                    />
+                  {blockItems.map((item) => (
+                    <ItemRow key={item.id} item={item} periodKey={dayKey} />
                   ))}
+                  {editMode && <AddItemRow frequency="daily" block={block} />}
                 </ul>
               </div>
             ))}
@@ -329,23 +432,19 @@ function DashboardPage() {
           <div className="mb-1 flex items-center justify-between gap-2">
             <h2 className="font-display text-lg">Rotina semanal</h2>
             <span className="text-xs font-medium text-muted-foreground">
-              {weeklyDone} de {WEEKLY_ITEMS.length} feitas
+              {weeklyDone} de {weeklyItems.length} feitas
             </span>
           </div>
-          <ProgressBar done={weeklyDone} total={WEEKLY_ITEMS.length} />
+          <ProgressBar done={weeklyDone} total={weeklyItems.length} />
           <p className="mt-2 text-xs text-muted-foreground">
             Não precisa fazer tudo num dia só — marque conforme for dando conta. Reseta toda
             segunda-feira.
           </p>
           <ul className="mt-3 divide-y divide-border">
-            {WEEKLY_ITEMS.map((item) => (
-              <ChecklistRow
-                key={item.key}
-                item={item}
-                checked={isChecked(weekKey, item.key)}
-                onToggle={() => toggleItem(weekKey, item.key)}
-              />
+            {weeklyItems.map((item) => (
+              <ItemRow key={item.id} item={item} periodKey={weekKey} />
             ))}
+            {editMode && <AddItemRow frequency="weekly" block="Semanal" />}
           </ul>
         </section>
       </div>
