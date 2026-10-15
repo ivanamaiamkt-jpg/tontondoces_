@@ -18,12 +18,9 @@ import imgPrazerCamadas from "@/assets/produtos/prazer-em-camadas.webp";
 import imgBrownie from "@/assets/produtos/brownie.webp";
 import imgCopoMerengue from "@/assets/produtos/copo-merengue.webp";
 import imgSurpresaUva from "@/assets/produtos/surpresa-uva.webp";
-import imgNuvemOreo from "@/assets/produtos/nuvem-oreo-new.jpeg";
 import imgCoxinhaBrigadeiro from "@/assets/produtos/coxinha-brigadeiro.webp";
 import imgMorangoAmor from "@/assets/produtos/morango-do-amor.jpeg";
 import imgEspetinhoUva from "@/assets/produtos/espetinho-uva.jpeg";
-import imgBrigadeiroOreo from "@/assets/produtos/brigadeiro-oreo.jpeg";
-import imgBrigadeiroNinhoOreo from "@/assets/produtos/brigadeiro-ninho-oreo.png";
 import imgEspetinhoMorangoChoc from "@/assets/produtos/espetinho-morango-choc.png";
 import imgEspetinhoMorangoNinho from "@/assets/produtos/espetinho-morango-ninho.jpeg";
 import imgMorangoCravejadoTradicional from "@/assets/produtos/morango-cravejado-tradicional.jpeg";
@@ -371,12 +368,6 @@ export const CATEGORIES: Category[] = [
       p("gourmet-espetinho-morango-ninho", "Espetinho de Morango com Brigadeiro de Ninho", 25.0, imgEspetinhoMorangoNinho, {
         description: "3 morangos + brigadeiro de Ninho + chocolate pra fechar com chave de ouro.",
       }),
-      p("gourmet-brig-oreo", "Brigadeiro Gourmet Recheado com Bolacha Oreo", 9.99, imgBrigadeiroOreo, {
-        description: "Brigadeiro gourmet com pedaços crocantes de Oreo explodindo no recheio.",
-      }),
-      p("gourmet-brig-ninho-oreo", "Brigadeiro de Ninho Recheado com Bolacha Oreo", 9.99, imgBrigadeiroNinhoOreo, {
-        description: "Brigadeiro de Ninho cremoso com bolacha Oreo crocante. Explosão de sabores.",
-      }),
       p("gourmet-coxinha-brigadeiro", "Coxinha de Brigadeiro — Escolha o Sabor", 14.0, imgCoxinhaBrigadeiro, {
         description: "Casquinha crocante, recheio cremoso de brigadeiro. Feita pra agradar todos os gostos.",
         flavors: [
@@ -390,9 +381,6 @@ export const CATEGORIES: Category[] = [
       }),
       p("gourmet-morango-amor", "Morango do Amor com Creme Branco", 25.0, imgMorangoAmor, {
         description: "A crocância do caramelo, o azedinho do morango e a cremosidade do creme branco. Tudo na mesma mordida.",
-      }),
-      p("gourmet-nuvem-oreo", "Nuvem de Oreo", 9.9, imgNuvemOreo, {
-        description: "Delicioso mousse cremoso de leite Ninho, super leve e aerado, combinado com pedaços crocantes de Oreo.",
       }),
     ],
   },
