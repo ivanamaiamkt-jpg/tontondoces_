@@ -315,20 +315,17 @@ export const CATEGORIES: Category[] = [
     title: "Bombom no Copo",
     description: "",
     products: [
-      p("bombom-uva-morango", "Bombom Dois Sabores — Uva e Morango", 21.9, imgBombomMorango2, {
+      p("bombom-uva-morango", "Bombom Dois Sabores — Uva e Morango", 28.9, imgBombomMorango2, {
         description:
           "250g de uvas e morangos frescos afundando em brigadeiro cremoso com ganache espelhada. Impossível comer devagar.",
-        originalPrice: 28.9,
       }),
-      p("bombom-ninho-uva", "Bombom no Copo — Mousse de Ninho e Uvas", 21.9, imgBombomUva, {
+      p("bombom-ninho-uva", "Bombom no Copo — Mousse de Ninho e Uvas", 28.9, imgBombomUva, {
         description:
           "250g de mousse de Ninho aveludada abraçando uvas geladinhas. Leve, cremoso e viciante.",
-        originalPrice: 28.9,
       }),
-      p("bombom-ninho-morango", "Bombom Mousse de Ninho e Morango", 21.9, imgBombomMorango, {
+      p("bombom-ninho-morango", "Bombom Mousse de Ninho e Morango", 28.9, imgBombomMorango, {
         description:
           "250g de mousse de Ninho com morangos suculentos e ganache. Cada colherada é uma surpresa.",
-        originalPrice: 28.9,
       }),
     ],
   },
