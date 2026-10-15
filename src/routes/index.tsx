@@ -70,9 +70,9 @@ function HomePage() {
             className="hero-tonton-logo"
           />
           <h2 className="hero-tonton-title">
-            Brigadeiros absurdamente cremosos entregues na sua porta
+            Brigadeiros absurdamente cremosos, prontinhos pra você buscar
           </h2>
-          <p className="hero-tonton-sub">📍 Sorocaba e região</p>
+          <p className="hero-tonton-sub">📍 Retirada na Vila Mineirão, Sorocaba</p>
 
         </div>
         <div className="hero-tonton-right">

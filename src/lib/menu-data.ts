@@ -399,22 +399,10 @@ export const CATEGORIES: Category[] = [
 ];
 
 /* =========================================================
- * Delivery & contato
+ * Loja & contato (sem entrega própria: retirada ou Uber chamado pelo cliente)
  * ========================================================= */
 
-export const DELIVERY_FEES: Record<string, number> = {
-  centro: 5,
-  "vila nova": 7,
-  "jardim américa": 8,
-  "jardim america": 8,
-  "bairro industrial": 10,
-};
-
-export function getDeliveryFee(neighborhood: string): number | null {
-  const key = neighborhood.trim().toLowerCase();
-  if (key in DELIVERY_FEES) return DELIVERY_FEES[key];
-  return null;
-}
+export const STORE_ADDRESS = "Rua Pedro Lombardi, 890 - Vila Mineirão, Sorocaba - SP, 18076-520";
 
 export const OWNER_WHATSAPP = "5515998564202";
 export const MIN_ORDER = 25;

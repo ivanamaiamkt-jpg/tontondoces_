@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { X, Check, Heart, Copy, MessageCircle, Loader2, ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, Check, Heart, Copy, MessageCircle, ArrowLeft, Store, Car } from "lucide-react";
 import { useOrder } from "@/contexts/order-context";
-import { OWNER_WHATSAPP, MIN_ORDER } from "@/lib/menu-data";
-import { brl, maskPhone, maskCep } from "@/lib/format";
-import { quoteDelivery, STORE_ADDRESS, STORE_NEIGHBORHOOD } from "@/lib/delivery";
+import { OWNER_WHATSAPP, MIN_ORDER, STORE_ADDRESS } from "@/lib/menu-data";
+import { brl, maskPhone } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,61 +10,44 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { trackPixel } from "@/lib/fbq";
-import { syncAbandonedCart, markCartConverted, markCartOutOfArea } from "@/lib/abandoned-cart";
+import { syncAbandonedCart, markCartConverted } from "@/lib/abandoned-cart";
 import { getStoredUtm } from "@/lib/analytics";
 import { getStoreStatus } from "@/lib/store-hours";
 import { isPaused, PAUSE_WHATSAPP_NOTE } from "@/lib/pause-mode";
 
 const PIX_KEY = "diretorios.tonton@gmail.com";
 
-type FeeState =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "ok"; fee: number; distanceKm: number | null }
-  | { kind: "out"; distanceKm: number }
-  | { kind: "error" };
+type Receiving = "pickup" | "uber";
 
-const STEP_LABELS = ["Quem é você?", "Para onde entregamos?", "Confirmar pedido"];
+const STEP_LABELS = ["Quem é você?", "Como você quer receber?", "Confirmar pedido"];
+
+const RECEIVING_WHATSAPP: Record<Receiving, string> = {
+  pickup: "Retirada na loja",
+  uber: "Uber (cliente chama quando avisarmos)",
+};
+
+const RECEIVING_SUMMARY: Record<Receiving, string> = {
+  pickup: "Retirada na loja",
+  uber: "Uber (você chama)",
+};
 
 export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const {
-    items,
-    delivery,
-    subtotal,
-    clearCart,
-    setCartOpen,
-    setDelivery,
-    customer,
-  } = useOrder();
+  const { items, subtotal, total, clearCart, setCartOpen, customer } = useOrder();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [name, setName] = useState(customer?.name ?? "");
   const [phone, setPhone] = useState(customer?.phone ? maskPhone(customer.phone) : "");
-  const [cep, setCep] = useState(delivery?.cep ?? "");
-  const [street, setStreet] = useState(delivery?.street ?? "");
-  const [number, setNumber] = useState("");
-  const [complement, setComplement] = useState("");
-  const [neighborhood, setNeighborhood] = useState(delivery?.neighborhood ?? "");
-  const [city, setCity] = useState(delivery?.city ?? "");
-  const [state, setState] = useState(delivery?.state ?? "");
-  const [cepLoading, setCepLoading] = useState(false);
-  const [cepError, setCepError] = useState<string | null>(null);
-  const [fee, setFee] = useState<FeeState>(
-    delivery?.fee != null
-      ? { kind: "ok", fee: delivery.fee, distanceKm: null }
-      : { kind: "idle" },
-  );
+  const [receiving, setReceiving] = useState<Receiving | null>(null);
   const [payment, setPayment] = useState<"pix" | "maquininha">("pix");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [acceptedOutOfArea, setAcceptedOutOfArea] = useState(false);
   const [confirmed, setConfirmed] = useState<{
     orderId: string;
     payment: "pix" | "maquininha";
     total: number;
     name: string;
     summary: string;
-    outOfArea: boolean;
+    receiving: Receiving;
   } | null>(null);
   const [sent, setSent] = useState(false);
   const [storeStatus, setStoreStatus] = useState(() => getStoreStatus());
@@ -81,134 +63,23 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customer?.name, customer?.phone]);
 
-  const lookupSeq = useRef(0);
-
-  const runLookup = async (rawCep: string) => {
-    const digits = rawCep.replace(/\D/g, "");
-    if (digits.length !== 8) return;
-    const seq = ++lookupSeq.current;
-    setCepLoading(true);
-    setCepError(null);
-    setFee({ kind: "idle" });
-    setAcceptedOutOfArea(false);
-    try {
-      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
-      const data = await res.json();
-      if (seq !== lookupSeq.current) return;
-      if (data.erro) {
-        setCepError("CEP não encontrado. Confere o número?");
-        setCepLoading(false);
-        return;
-      }
-      const st = data.logradouro ?? "";
-      const nb = data.bairro ?? "";
-      const ct = data.localidade ?? "";
-      const uf = data.uf ?? "";
-      setStreet(st);
-      setNeighborhood(nb);
-      setCity(ct);
-      setState(uf);
-      setCepLoading(false);
-
-      setFee({ kind: "loading" });
-      const cityNorm = ct
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .trim();
-      if (cityNorm && cityNorm !== "sorocaba") {
-        if (seq !== lookupSeq.current) return;
-        setFee({ kind: "out", distanceKm: 0 });
-        setDelivery({
-          mode: "delivery",
-          cep: rawCep,
-          street: st,
-          neighborhood: nb,
-          city: ct,
-          state: uf,
-          fee: null,
-        });
-        return;
-      }
-      const r = await quoteDelivery({ street: st, neighborhood: nb, cep: rawCep });
-      if (seq !== lookupSeq.current) return;
-      if (r.ok) {
-        setFee({ kind: "ok", fee: r.fee, distanceKm: r.distanceKm });
-        setDelivery({
-          mode: "delivery",
-          cep: rawCep,
-          street: st,
-          neighborhood: nb,
-          city: ct,
-          state: uf,
-          fee: r.fee,
-        });
-      } else if (r.reason === "out_of_area") {
-        setFee({ kind: "out", distanceKm: r.distanceKm });
-        setDelivery({
-          mode: "delivery",
-          cep: rawCep,
-          street: st,
-          neighborhood: nb,
-          city: ct,
-          state: uf,
-          fee: null,
-        });
-      } else {
-        setFee({ kind: "error" });
-        setDelivery({
-          mode: "delivery",
-          cep: rawCep,
-          street: st,
-          neighborhood: nb,
-          city: ct,
-          state: uf,
-          fee: null,
-        });
-      }
-    } catch {
-      if (seq !== lookupSeq.current) return;
-      setCepError("Não consegui consultar o CEP. Tenta de novo?");
-      setCepLoading(false);
-    }
-  };
-
-  const handleCepChange = (v: string) => {
-    const masked = maskCep(v);
-    setCep(masked);
-    const digits = masked.replace(/\D/g, "");
-    if (digits.length === 8) {
-      void runLookup(masked);
-    } else {
-      setCepError(null);
-      setFee({ kind: "idle" });
-      setAcceptedOutOfArea(false);
-    }
-  };
-
   if (!open) return null;
 
-  const cepValid = cep.replace(/\D/g, "").length === 8 && !cepError;
   const phoneDigits = phone.replace(/\D/g, "");
   const step1Valid = name.trim().length >= 2 && phoneDigits.length >= 10;
-  const outOfArea = fee.kind === "out";
-  const step2Valid =
-    cepValid && number.trim().length > 0 && (fee.kind === "ok" || (outOfArea && acceptedOutOfArea));
+  const step2Valid = receiving !== null;
+  // Com Uber o pagamento é sempre PIX adiantado (o motorista não leva maquininha).
+  const effectivePayment: "pix" | "maquininha" = receiving === "uber" ? "pix" : payment;
 
-  const effectiveFee = fee.kind === "ok" ? fee.fee : 0;
-  const total = subtotal + effectiveFee;
-
-  const cancelOutOfAreaCart = () => {
-    void markCartOutOfArea();
-    clearCart();
-    onClose();
+  const chooseReceiving = (r: Receiving) => {
+    setReceiving(r);
+    if (r === "uber") setPayment("pix");
   };
 
   const handleSubmit = async () => {
-    if (!step1Valid || !step2Valid || submitting || subtotal < MIN_ORDER) return;
+    if (!step1Valid || !receiving || submitting || subtotal < MIN_ORDER) return;
     setSubmitting(true);
     const orderId = `TT-${Date.now().toString().slice(-6)}`;
-    const outOfAreaNote = "Fora da área — cliente vai pedir Uber entrega ou retirar.";
 
     try {
       await supabase.from("orders" as never).insert({
@@ -216,18 +87,13 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
         customer_id: customer?.id ?? null,
         customer_name: name,
         customer_phone: phoneDigits,
-        delivery_mode: "delivery",
-        street,
-        number,
-        complement: complement || null,
-        neighborhood,
-        city: city || null,
+        delivery_mode: receiving,
         items: items as unknown as object,
         subtotal,
-        delivery_fee: effectiveFee,
+        delivery_fee: 0,
         total,
-        payment_method: payment,
-        notes: outOfArea ? `${outOfAreaNote}${notes ? " " + notes : ""}` : notes || null,
+        payment_method: effectivePayment,
+        notes: notes || null,
         status: "novo",
         ...getStoredUtm(),
       } as never);
@@ -249,19 +115,12 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
       if (it.needsConfirmation) lines.push(`   ⚠️ Menos de 24h — sujeito a confirmação`);
     });
     lines.push("");
-    lines.push(`*Subtotal:* ${brl(subtotal)}`);
-    lines.push(
-      `*Taxa de entrega:* ${outOfArea ? "Cliente busca (fora da área)" : brl(effectiveFee)}`,
-    );
-    lines.push(
-      `*Endereço:* ${street}, ${number}${complement ? ` — ${complement}` : ""} — ${neighborhood} — ${city} — CEP ${cep}`,
-    );
+    lines.push(`*Recebimento:* ${RECEIVING_WHATSAPP[receiving]}`);
     lines.push(`*Total:* ${brl(total)}`);
     lines.push("");
     lines.push(
-      `*Pagamento:* ${payment === "pix" ? "PIX (chave enviada após confirmação)" : "Cartão (débito ou crédito na entrega)"}`,
+      `*Pagamento:* ${effectivePayment === "pix" ? "PIX (chave enviada após confirmação)" : "Cartão (débito ou crédito na retirada)"}`,
     );
-    if (outOfArea) lines.push(`*Observação:* ${outOfAreaNote}`);
     if (notes) lines.push(`*Observações:* ${notes}`);
     if (isPaused()) {
       lines.push("");
@@ -284,7 +143,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
       void syncAbandonedCart({ nome: name, telefone: phoneDigits, items });
     }
 
-    setConfirmed({ orderId, payment, total, name, summary, outOfArea });
+    setConfirmed({ orderId, payment: effectivePayment, total, name, summary, receiving });
     setSent(false);
     setSubmitting(false);
   };
@@ -341,6 +200,11 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     else if (step === 3) setStep(2);
   };
 
+  const optionCls = (selected: boolean) =>
+    `w-full rounded-2xl border-2 p-4 text-left transition ${
+      selected ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/40"
+    }`;
+
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-primary/70 backdrop-blur-sm sm:items-center">
       <div className="flex max-h-[95vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-background shadow-2xl sm:rounded-3xl">
@@ -391,7 +255,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
               <strong>{brl(confirmed.total)}</strong>
               <br />
               Forma de pagamento:{" "}
-              <strong>{confirmed.payment === "pix" ? "PIX" : "Cartão na entrega"}</strong>
+              <strong>{confirmed.payment === "pix" ? "PIX" : "Cartão na retirada"}</strong>
             </p>
 
             {confirmed.payment === "pix" && (
@@ -418,34 +282,34 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
 
             {confirmed.payment === "maquininha" && (
               <div className="mt-5 rounded-2xl border border-gold/40 bg-gold/10 p-4 text-left text-sm text-chocolate">
-                💳 Pagamento na entrega — débito ou crédito na maquininha.
+                💳 Pagamento na retirada — débito ou crédito na maquininha.
               </div>
             )}
 
-            {confirmed.outOfArea && (
-              <div className="mt-5 rounded-2xl border-2 border-primary/30 bg-primary/5 p-4 text-left">
-                <p className="font-display text-sm font-semibold text-primary">
-                  🚗 Endereço da loja (pra chamar seu Uber/moto)
-                </p>
-                <div className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
-                  <code className="flex-1 text-sm font-medium text-foreground">
-                    {STORE_ADDRESS}
-                  </code>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(STORE_ADDRESS);
-                      toast.success("Endereço copiado!");
-                    }}
-                    className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-glow"
-                  >
-                    <Copy className="h-3.5 w-3.5" /> Copiar
-                  </button>
-                </div>
-                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                  Cola esse endereço no app de corrida da sua preferência pra buscar seu pedido 💕
-                </p>
+            <div className="mt-5 rounded-2xl border-2 border-primary/30 bg-primary/5 p-4 text-left">
+              <p className="font-display text-sm font-semibold text-primary">
+                {confirmed.receiving === "uber"
+                  ? "🚗 Endereço da loja (pra chamar seu Uber)"
+                  : "📍 Endereço da loja (pra retirar)"}
+              </p>
+              <div className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
+                <code className="flex-1 text-sm font-medium text-foreground">{STORE_ADDRESS}</code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(STORE_ADDRESS);
+                    toast.success("Endereço copiado!");
+                  }}
+                  className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-glow"
+                >
+                  <Copy className="h-3.5 w-3.5" /> Copiar
+                </button>
               </div>
-            )}
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                {confirmed.receiving === "uber"
+                  ? "Quando avisarmos que está pronto, cole esse endereço no app do Uber/99."
+                  : "Avisamos no WhatsApp quando estiver pronto 💕"}
+              </p>
+            </div>
 
             {!sent ? (
               <>
@@ -519,127 +383,45 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
               )}
 
               {step === 2 && (
-                <>
-                  <div>
-                    <Label>CEP *</Label>
-                    <Input
-                      value={cep}
-                      onChange={(e) => handleCepChange(e.target.value)}
-                      className="mt-1"
-                      placeholder="00000-000"
-                      inputMode="numeric"
-                      maxLength={9}
-                    />
-                    {cepLoading && (
-                      <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Loader2 className="h-3 w-3 animate-spin" /> Consultando CEP...
-                      </p>
-                    )}
-                    {cepError && (
-                      <p className="mt-1.5 text-xs text-destructive">{cepError}</p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="col-span-2">
-                      <Label className="text-xs">Rua</Label>
-                      <Input
-                        value={street}
-                        onChange={(e) => setStreet(e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Número *</Label>
-                      <Input
-                        value={number}
-                        onChange={(e) => setNumber(e.target.value)}
-                        className="mt-1"
-                        inputMode="numeric"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-xs">Complemento</Label>
-                    <Input
-                      value={complement}
-                      onChange={(e) => setComplement(e.target.value)}
-                      className="mt-1"
-                      placeholder="apto, bloco, referência"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-xs">Bairro</Label>
-                    <Input
-                      value={neighborhood}
-                      onChange={(e) => setNeighborhood(e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-
-                  {fee.kind === "loading" && (
-                    <p className="inline-flex items-center gap-1.5 rounded-xl bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> 📍 Calculando taxa...
-                    </p>
-                  )}
-                  {fee.kind === "ok" && (
-                    <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
-                      {fee.fee === 0
-                        ? "✓ Entrega Grátis 🎉"
-                        : fee.distanceKm != null
-                          ? `✓ ${fee.distanceKm.toFixed(1).replace(".", ",")}km · Taxa: ${brl(fee.fee)}`
-                          : `✓ Taxa: ${brl(fee.fee)}`}
-                    </p>
-                  )}
-                  {fee.kind === "out" && !acceptedOutOfArea && (
-                    <div className="space-y-2 rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-800">
-                      <p className="font-medium">⚠️ Fora da área de entrega</p>
-                      <p>
-                        Estamos no bairro {STORE_NEIGHBORHOOD}, você pode pedir um Uber ou
-                        retirar aqui.
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setAcceptedOutOfArea(true)}
-                          className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-glow"
-                        >
-                          Quero seguir
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelOutOfAreaCart}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
-                        >
-                          Cancelar carrinho
-                        </button>
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    aria-pressed={receiving === "pickup"}
+                    onClick={() => chooseReceiving("pickup")}
+                    className={optionCls(receiving === "pickup")}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Store className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                      <div>
+                        <div className="font-semibold text-foreground">Retirar na loja</div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          Rua Pedro Lombardi, 890 — Vila Mineirão. Avisamos no WhatsApp quando
+                          estiver pronto.
+                        </div>
                       </div>
-                      <a
-                        href={`https://wa.me/${OWNER_WHATSAPP}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 underline"
-                      >
-                        <MessageCircle className="h-3.5 w-3.5" /> Falar no WhatsApp
-                      </a>
                     </div>
-                  )}
-                  {fee.kind === "out" && acceptedOutOfArea && (
-                    <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
-                      ✓ Combinado, você vai pedir um Uber entrega ou retirar.
-                    </p>
-                  )}
-                  {fee.kind === "error" && (
-                    <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                      Não consegui calcular agora — tenta novamente.
-                    </p>
-                  )}
-                </>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={receiving === "uber"}
+                    onClick={() => chooseReceiving("uber")}
+                    className={optionCls(receiving === "uber")}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Car className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                      <div>
+                        <div className="font-semibold text-foreground">Vou chamar um Uber</div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          Você chama o Uber (ou moto) pra buscar aqui. Avisamos no WhatsApp quando
+                          estiver pronto, aí é só chamar.
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                </div>
               )}
 
-              {step === 3 && (
+              {step === 3 && receiving && (
                 <>
                   <div className="rounded-2xl border border-border bg-card p-4">
                     <p className="font-display text-sm font-semibold text-primary">Itens</p>
@@ -667,7 +449,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                         type="button"
                         onClick={() => setPayment("pix")}
                         className={`rounded-xl border-2 p-3 text-left text-sm transition ${
-                          payment === "pix"
+                          effectivePayment === "pix"
                             ? "border-primary bg-primary/5"
                             : "border-border bg-card"
                         }`}
@@ -677,21 +459,28 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                           Chave enviada após confirmação do pedido
                         </div>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setPayment("maquininha")}
-                        className={`rounded-xl border-2 p-3 text-left text-sm transition ${
-                          payment === "maquininha"
-                            ? "border-primary bg-primary/5"
-                            : "border-border bg-card"
-                        }`}
-                      >
-                        <div className="font-semibold text-foreground">💳 Cartão</div>
-                        <div className="text-xs text-muted-foreground">
-                          Débito ou crédito na entrega
-                        </div>
-                      </button>
+                      {receiving === "pickup" && (
+                        <button
+                          type="button"
+                          onClick={() => setPayment("maquininha")}
+                          className={`rounded-xl border-2 p-3 text-left text-sm transition ${
+                            effectivePayment === "maquininha"
+                              ? "border-primary bg-primary/5"
+                              : "border-border bg-card"
+                          }`}
+                        >
+                          <div className="font-semibold text-foreground">💳 Cartão</div>
+                          <div className="text-xs text-muted-foreground">
+                            Débito ou crédito na retirada
+                          </div>
+                        </button>
+                      )}
                     </div>
+                    {receiving === "uber" && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Com Uber o pagamento é só por PIX, adiantado.
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -708,24 +497,9 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                   <div className="rounded-2xl border border-border bg-primary/5 p-4">
                     <dl className="space-y-1 text-sm">
                       <div className="flex justify-between">
-                        <dt className="text-muted-foreground">Subtotal</dt>
-                        <dd>{brl(subtotal)}</dd>
+                        <dt className="text-muted-foreground">Recebimento</dt>
+                        <dd>{RECEIVING_SUMMARY[receiving]}</dd>
                       </div>
-                      <div className="flex justify-between">
-                        <dt className="text-muted-foreground">Taxa de entrega</dt>
-                        <dd>
-                          {outOfArea
-                            ? "Uber ou retirada"
-                            : effectiveFee === 0
-                              ? "Grátis"
-                              : brl(effectiveFee)}
-                        </dd>
-                      </div>
-                      {outOfArea && (
-                        <p className="text-xs text-muted-foreground">
-                          Endereço da loja aparece após confirmar.
-                        </p>
-                      )}
                       <div className="flex justify-between border-t border-border pt-2 text-base font-semibold">
                         <dt>Total</dt>
                         <dd className="font-display text-lg text-primary">{brl(total)}</dd>
@@ -745,16 +519,14 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
 
             <div className="border-t border-border bg-card p-5">
               {step < 3 ? (
-                !(step === 2 && outOfArea && !acceptedOutOfArea) && (
-                  <Button
-                    onClick={goNext}
-                    disabled={(step === 1 && !step1Valid) || (step === 2 && !step2Valid)}
-                    size="lg"
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary-glow"
-                  >
-                    Continuar
-                  </Button>
-                )
+                <Button
+                  onClick={goNext}
+                  disabled={(step === 1 && !step1Valid) || (step === 2 && !step2Valid)}
+                  size="lg"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary-glow"
+                >
+                  Continuar
+                </Button>
               ) : (
                 <>
                   {!storeStatus.open && (

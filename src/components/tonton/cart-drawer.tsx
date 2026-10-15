@@ -17,9 +17,7 @@ export function CartDrawer() {
     updateQty,
     removeItem,
     subtotal,
-    deliveryFee,
     total,
-    delivery,
   } = useOrder();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const initiatedRef = useRef(false);
@@ -214,12 +212,6 @@ export function CartDrawer() {
                     <dt className="text-muted-foreground">Subtotal</dt>
                     <dd>{brl(subtotal)}</dd>
                   </div>
-                  {delivery?.mode === "delivery" && (
-                    <div className="flex justify-between">
-                      <dt className="text-muted-foreground">Taxa de entrega</dt>
-                      <dd>{brl(deliveryFee)}</dd>
-                    </div>
-                  )}
                 </dl>
               </div>
 

@@ -22,9 +22,7 @@ import { Route as AdminClientesRouteImport } from './routes/admin.clientes'
 import { Route as AdminConfiguracoesRouteImport } from './routes/admin.configuracoes'
 import { Route as AdminFinanceiroRouteImport } from './routes/admin.financeiro'
 import { Route as AdminPedidosRouteImport } from './routes/admin.pedidos'
-import { Route as AdminTaxasRouteImport } from './routes/admin.taxas'
 import { Route as AdminLoginRouteImport } from './routes/admin_.login'
-import { Route as EntregaOrderIdRouteImport } from './routes/entrega.$orderId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -91,19 +89,9 @@ const AdminPedidosRoute = AdminPedidosRouteImport.update({
   path: '/pedidos',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminTaxasRoute = AdminTaxasRouteImport.update({
-  id: '/taxas',
-  path: '/taxas',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/admin_/login',
   path: '/admin/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EntregaOrderIdRoute = EntregaOrderIdRouteImport.update({
-  id: '/entrega/$orderId',
-  path: '/entrega/$orderId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -120,9 +108,7 @@ export interface FileRoutesByFullPath {
   '/admin/configuracoes': typeof AdminConfiguracoesRoute
   '/admin/financeiro': typeof AdminFinanceiroRoute
   '/admin/pedidos': typeof AdminPedidosRoute
-  '/admin/taxas': typeof AdminTaxasRoute
   '/admin/login': typeof AdminLoginRoute
-  '/entrega/$orderId': typeof EntregaOrderIdRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -137,9 +123,7 @@ export interface FileRoutesByTo {
   '/admin/configuracoes': typeof AdminConfiguracoesRoute
   '/admin/financeiro': typeof AdminFinanceiroRoute
   '/admin/pedidos': typeof AdminPedidosRoute
-  '/admin/taxas': typeof AdminTaxasRoute
   '/admin/login': typeof AdminLoginRoute
-  '/entrega/$orderId': typeof EntregaOrderIdRoute
   '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
@@ -156,9 +140,7 @@ export interface FileRoutesById {
   '/admin/configuracoes': typeof AdminConfiguracoesRoute
   '/admin/financeiro': typeof AdminFinanceiroRoute
   '/admin/pedidos': typeof AdminPedidosRoute
-  '/admin/taxas': typeof AdminTaxasRoute
   '/admin_/login': typeof AdminLoginRoute
-  '/entrega/$orderId': typeof EntregaOrderIdRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -176,9 +158,7 @@ export interface FileRouteTypes {
     | '/admin/configuracoes'
     | '/admin/financeiro'
     | '/admin/pedidos'
-    | '/admin/taxas'
     | '/admin/login'
-    | '/entrega/$orderId'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -193,9 +173,7 @@ export interface FileRouteTypes {
     | '/admin/configuracoes'
     | '/admin/financeiro'
     | '/admin/pedidos'
-    | '/admin/taxas'
     | '/admin/login'
-    | '/entrega/$orderId'
     | '/admin'
   id:
     | '__root__'
@@ -211,9 +189,7 @@ export interface FileRouteTypes {
     | '/admin/configuracoes'
     | '/admin/financeiro'
     | '/admin/pedidos'
-    | '/admin/taxas'
     | '/admin_/login'
-    | '/entrega/$orderId'
     | '/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -223,7 +199,6 @@ export interface RootRouteChildren {
   MeusPedidosRoute: typeof MeusPedidosRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   AdminLoginRoute: typeof AdminLoginRoute
-  EntregaOrderIdRoute: typeof EntregaOrderIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -319,25 +294,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPedidosRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/taxas': {
-      id: '/admin/taxas'
-      path: '/taxas'
-      fullPath: '/admin/taxas'
-      preLoaderRoute: typeof AdminTaxasRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin_/login': {
       id: '/admin_/login'
       path: '/admin/login'
       fullPath: '/admin/login'
       preLoaderRoute: typeof AdminLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/entrega/$orderId': {
-      id: '/entrega/$orderId'
-      path: '/entrega/$orderId'
-      fullPath: '/entrega/$orderId'
-      preLoaderRoute: typeof EntregaOrderIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -352,7 +313,6 @@ interface AdminRouteChildren {
   AdminConfiguracoesRoute: typeof AdminConfiguracoesRoute
   AdminFinanceiroRoute: typeof AdminFinanceiroRoute
   AdminPedidosRoute: typeof AdminPedidosRoute
-  AdminTaxasRoute: typeof AdminTaxasRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
@@ -365,7 +325,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminConfiguracoesRoute: AdminConfiguracoesRoute,
   AdminFinanceiroRoute: AdminFinanceiroRoute,
   AdminPedidosRoute: AdminPedidosRoute,
-  AdminTaxasRoute: AdminTaxasRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 
@@ -377,7 +336,6 @@ const rootRouteChildren: RootRouteChildren = {
   MeusPedidosRoute: MeusPedidosRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   AdminLoginRoute: AdminLoginRoute,
-  EntregaOrderIdRoute: EntregaOrderIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

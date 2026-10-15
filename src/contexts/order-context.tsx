@@ -10,18 +10,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { syncAbandonedCart } from "@/lib/abandoned-cart";
 
-export type DeliveryMode = "delivery" | "pickup";
-
-export type DeliveryInfo = {
-  mode: DeliveryMode;
-  cep?: string;
-  street?: string;
-  neighborhood?: string;
-  city?: string;
-  state?: string;
-  fee?: number | null; // null = sob consulta, undefined = pickup
-};
-
 export type CartItem = {
   /** Unique line id (random) so the same product+flavor combos can repeat. */
   lineId: string;
@@ -47,15 +35,12 @@ export type Customer = {
 type AddItemPayload = Omit<CartItem, "lineId" | "quantity"> & { quantity?: number };
 
 type OrderContextValue = {
-  delivery: DeliveryInfo | null;
-  setDelivery: (d: DeliveryInfo | null) => void;
   items: CartItem[];
   addItem: (item: AddItemPayload) => void;
   updateQty: (lineId: string, qty: number) => void;
   removeItem: (lineId: string) => void;
   clearCart: () => void;
   subtotal: number;
-  deliveryFee: number;
   total: number;
   cartOpen: boolean;
   setCartOpen: (open: boolean) => void;
@@ -68,12 +53,12 @@ type OrderContextValue = {
 
 const OrderContext = createContext<OrderContextValue | null>(null);
 
+// Chave antiga do endereço de entrega (a loja não entrega mais) — só é limpa.
 const STORAGE_DELIVERY = "tonton.delivery";
 const STORAGE_CART = "tonton.cart";
 const STORAGE_CUSTOMER = "tonton_cliente";
 
 export function OrderProvider({ children }: { children: ReactNode }) {
-  const [delivery, setDeliveryState] = useState<DeliveryInfo | null>(null);
   const [items, setItems] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -89,10 +74,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   // Hydrate from localStorage (client-only).
   useEffect(() => {
     try {
-      const d = localStorage.getItem(STORAGE_DELIVERY);
+      localStorage.removeItem(STORAGE_DELIVERY);
       const c = localStorage.getItem(STORAGE_CART);
       const cu = localStorage.getItem(STORAGE_CUSTOMER);
-      if (d) setDeliveryState(JSON.parse(d));
       if (c) setItems(JSON.parse(c));
       if (cu) setCustomer(JSON.parse(cu));
     } catch {
@@ -101,20 +85,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (delivery) localStorage.setItem(STORAGE_DELIVERY, JSON.stringify(delivery));
-    else localStorage.removeItem(STORAGE_DELIVERY);
-  }, [delivery]);
-
-  useEffect(() => {
     localStorage.setItem(STORAGE_CART, JSON.stringify(items));
     if (customer && items.length > 0) {
       syncAbandonedCart({ nome: customer.name, telefone: customer.phone, items });
     }
   }, [items, customer]);
-
-  const setDelivery = (d: DeliveryInfo | null) => {
-    setDeliveryState(d);
-  };
 
   const pushItem = (item: AddItemPayload) => {
     setItems((prev) => [
@@ -208,25 +183,17 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     [items],
   );
 
-  const deliveryFee = useMemo(() => {
-    if (!delivery || delivery.mode !== "delivery") return 0;
-    return delivery.fee ?? 0;
-  }, [delivery]);
-
-  const total = subtotal + deliveryFee;
+  const total = subtotal;
 
   return (
     <OrderContext.Provider
       value={{
-        delivery,
-        setDelivery,
         items,
         addItem,
         updateQty,
         removeItem,
         clearCart,
         subtotal,
-        deliveryFee,
         total,
         cartOpen,
         setCartOpen,

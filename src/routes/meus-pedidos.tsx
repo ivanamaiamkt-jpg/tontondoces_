@@ -59,8 +59,7 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   novo: { label: "Novo", cls: "bg-blue-100 text-blue-800" },
   em_producao: { label: "Em produção", cls: "bg-amber-100 text-amber-800" },
   pronto: { label: "Pronto", cls: "bg-green-100 text-green-800" },
-  aguardando_entrega: { label: "Aguardando entrega", cls: "bg-amber-100 text-amber-800" },
-  na_rua: { label: "Saiu pra entrega", cls: "bg-cyan-100 text-cyan-800" },
+  aguardando_entrega: { label: "Pronto", cls: "bg-green-100 text-green-800" },
   entregue: { label: "Entregue", cls: "bg-muted text-muted-foreground" },
   cancelado: { label: "Cancelado", cls: "bg-red-100 text-red-800" },
 };
@@ -306,7 +305,12 @@ function MeusPedidosPage() {
                   </ul>
                   <div className="mt-2 flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
-                      {o.delivery_mode === "delivery" ? "Entrega" : "Retirada"} ·{" "}
+                      {o.delivery_mode === "delivery"
+                        ? "Entrega"
+                        : o.delivery_mode === "uber"
+                          ? "Uber"
+                          : "Retirada"}{" "}
+                      ·{" "}
                       {o.payment_method === "pix" ? "PIX" : "Maquininha"}
                     </span>
                     <span className="font-display text-base font-semibold text-primary">
