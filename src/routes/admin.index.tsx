@@ -380,6 +380,37 @@ function DashboardPage() {
         <h1 className="font-display text-3xl text-foreground">Visão geral</h1>
       </header>
 
+      {!stats ? (
+        <p className="mb-6 text-sm text-muted-foreground">Carregando...</p>
+      ) : (
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Pedidos hoje"
+            value={stats.ordersToday}
+            hint={`${stats.ordersWeek} nos últimos 7 dias`}
+            icon={ShoppingBag}
+          />
+          <StatCard
+            title="Faturamento hoje"
+            value={brl(stats.revenueToday)}
+            hint={`${brl(stats.revenueMonth)} no mês`}
+            icon={DollarSign}
+          />
+          <StatCard
+            title="Pedidos abertos"
+            value={stats.pending}
+            hint="Novos / em produção / prontos"
+            icon={TrendingUp}
+          />
+          <StatCard
+            title="Clientes"
+            value={stats.customers}
+            hint={`${stats.abandoned} carrinhos abandonados`}
+            icon={Users}
+          />
+        </div>
+      )}
+
       <div className="mb-6 rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4">
         <p className="font-display text-lg italic text-primary">Prosperidade vem de organização.</p>
         <p className="text-sm text-muted-foreground">
@@ -449,36 +480,6 @@ function DashboardPage() {
         </section>
       </div>
 
-      {!stats ? (
-        <p className="mt-6 text-sm text-muted-foreground">Carregando...</p>
-      ) : (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Pedidos hoje"
-            value={stats.ordersToday}
-            hint={`${stats.ordersWeek} nos últimos 7 dias`}
-            icon={ShoppingBag}
-          />
-          <StatCard
-            title="Faturamento hoje"
-            value={brl(stats.revenueToday)}
-            hint={`${brl(stats.revenueMonth)} no mês`}
-            icon={DollarSign}
-          />
-          <StatCard
-            title="Pedidos abertos"
-            value={stats.pending}
-            hint="Novos / em produção / prontos"
-            icon={TrendingUp}
-          />
-          <StatCard
-            title="Clientes"
-            value={stats.customers}
-            hint={`${stats.abandoned} carrinhos abandonados`}
-            icon={Users}
-          />
-        </div>
-      )}
     </div>
   );
 }
