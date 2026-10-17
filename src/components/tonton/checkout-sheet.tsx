@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { X, Check, Heart, Copy, MessageCircle, ArrowLeft, Store, Car } from "lucide-react";
 import { useOrder } from "@/contexts/order-context";
-import { OWNER_WHATSAPP, MIN_ORDER, STORE_ADDRESS } from "@/lib/menu-data";
+import { OWNER_WHATSAPP, STORE_ADDRESS } from "@/lib/menu-data";
+import { useMinOrder } from "@/lib/min-order";
 import { brl, maskPhone } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ const RECEIVING_SUMMARY: Record<Receiving, string> = {
 
 export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { items, subtotal, total, clearCart, setCartOpen, customer } = useOrder();
+  const MIN_ORDER = useMinOrder();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [name, setName] = useState(customer?.name ?? "");

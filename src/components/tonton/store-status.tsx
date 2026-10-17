@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
-import { OWNER_WHATSAPP, MIN_ORDER } from "@/lib/menu-data";
+import { OWNER_WHATSAPP } from "@/lib/menu-data";
 import { getStoreStatus } from "@/lib/store-hours";
+import { useMinOrder } from "@/lib/min-order";
+import { brl } from "@/lib/format";
 
 export function StoreStatus() {
+  const minOrder = useMinOrder();
   const [status, setStatus] = useState(() => getStoreStatus());
 
   useEffect(() => {
@@ -29,7 +32,7 @@ export function StoreStatus() {
       <span className="hidden h-3 w-px bg-white/20 sm:inline" />
 
       <span className="font-light text-primary-foreground/85">
-        Pedido mínimo: <span className="font-semibold text-gold">R$ {MIN_ORDER},00</span>
+        Pedido mínimo: <span className="font-semibold text-gold">{brl(minOrder)}</span>
       </span>
 
       <a

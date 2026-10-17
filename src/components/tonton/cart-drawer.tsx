@@ -4,7 +4,8 @@ import { useOrder } from "@/contexts/order-context";
 import { brl } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { CheckoutSheet } from "./checkout-sheet";
-import { getSuggestionProducts, MIN_ORDER } from "@/lib/menu-data";
+import { getSuggestionProducts } from "@/lib/menu-data";
+import { useMinOrder } from "@/lib/min-order";
 import { toast } from "sonner";
 import { trackPixel } from "@/lib/fbq";
 
@@ -19,6 +20,7 @@ export function CartDrawer() {
     subtotal,
     total,
   } = useOrder();
+  const MIN_ORDER = useMinOrder();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const initiatedRef = useRef(false);
 

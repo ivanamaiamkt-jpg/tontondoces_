@@ -16,6 +16,9 @@ import imgBombomMorango2 from "@/assets/produtos/bombom-copo-dois-sabores.jpeg";
 import imgBrigadeiros from "@/assets/produtos/brigadeiros-artesanais.webp";
 import imgPrazerCamadas from "@/assets/produtos/prazer-em-camadas.webp";
 import imgBrownie from "@/assets/produtos/brownie.webp";
+import imgNuvemOreo from "@/assets/produtos/nuvem-oreo-new.jpeg";
+import imgBrigadeiroOreo from "@/assets/produtos/brigadeiro-oreo.jpeg";
+import imgBrigadeiroNinhoOreo from "@/assets/produtos/brigadeiro-ninho-oreo.png";
 import imgCopoMerengue from "@/assets/produtos/copo-merengue.webp";
 import imgSurpresaUva from "@/assets/produtos/surpresa-uva.webp";
 import imgCoxinhaBrigadeiro from "@/assets/produtos/coxinha-brigadeiro.webp";
@@ -368,6 +371,12 @@ export const CATEGORIES: Category[] = [
       p("gourmet-espetinho-morango-ninho", "Espetinho de Morango com Brigadeiro de Ninho", 25.0, imgEspetinhoMorangoNinho, {
         description: "3 morangos + brigadeiro de Ninho + chocolate pra fechar com chave de ouro.",
       }),
+      p("gourmet-brig-oreo", "Brigadeiro Gourmet Recheado com Bolacha Oreo", 9.99, imgBrigadeiroOreo, {
+        description: "Brigadeiro gourmet com pedaços crocantes de Oreo explodindo no recheio.",
+      }),
+      p("gourmet-brig-ninho-oreo", "Brigadeiro de Ninho Recheado com Bolacha Oreo", 9.99, imgBrigadeiroNinhoOreo, {
+        description: "Brigadeiro de Ninho cremoso com bolacha Oreo crocante. Explosão de sabores.",
+      }),
       p("gourmet-coxinha-brigadeiro", "Coxinha de Brigadeiro — Escolha o Sabor", 14.0, imgCoxinhaBrigadeiro, {
         description: "Casquinha crocante, recheio cremoso de brigadeiro. Feita pra agradar todos os gostos.",
         flavors: [
@@ -382,6 +391,9 @@ export const CATEGORIES: Category[] = [
       p("gourmet-morango-amor", "Morango do Amor com Creme Branco", 25.0, imgMorangoAmor, {
         description: "A crocância do caramelo, o azedinho do morango e a cremosidade do creme branco. Tudo na mesma mordida.",
       }),
+      p("gourmet-nuvem-oreo", "Nuvem de Oreo", 9.9, imgNuvemOreo, {
+        description: "Delicioso mousse cremoso de leite Ninho, super leve e aerado, combinado com pedaços crocantes de Oreo.",
+      }),
     ],
   },
 ];
@@ -393,7 +405,6 @@ export const CATEGORIES: Category[] = [
 export const STORE_ADDRESS = "Rua Pedro Lombardi, 890 - Vila Mineirão, Sorocaba - SP, 18076-520";
 
 export const OWNER_WHATSAPP = "5515998564202";
-export const MIN_ORDER = 25;
 
 export function getSuggestionProducts(): Product[] {
   const out: Product[] = [];

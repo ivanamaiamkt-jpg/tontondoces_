@@ -10,6 +10,7 @@ export const Route = createFileRoute("/admin/configuracoes")({
 
 const FIELDS = [
   { key: "whatsapp", label: "WhatsApp da loja", placeholder: "5511999999999", help: "Só números, com código do país (55) e DDD." },
+  { key: "min_order", label: "Pedido mínimo (R$)", placeholder: "15", help: "Valor mínimo de um pedido, em reais. Ex.: 15 ou 15,50. Vale no site pra todos os clientes assim que você salvar." },
   { key: "pix_key", label: "Chave PIX", placeholder: "email@dominio.com" },
   { key: "store_open", label: "Loja aberta?", type: "select", options: ["true", "false"] },
   { key: "closed_message", label: "Mensagem quando fechada", placeholder: "Estamos fechados...", textarea: true },
@@ -32,9 +33,19 @@ function ConfigPage() {
   }, []);
 
   const save = async (key: string) => {
+    let value = values[key] ?? "";
+    if (key === "min_order") {
+      const n = Number(value.replace(",", "."));
+      if (!value.trim() || !Number.isFinite(n) || n < 0) {
+        toast.error("Digite um valor válido, por exemplo 15 ou 15,50");
+        return;
+      }
+      value = String(n);
+      setValues((v) => ({ ...v, min_order: value }));
+    }
     const { error } = await (supabase
       .from("store_settings" as never)
-      .upsert({ key, value: values[key], updated_at: new Date().toISOString() } as never));
+      .upsert({ key, value, updated_at: new Date().toISOString() } as never));
     if (error) toast.error(error.message);
     else toast.success("Salvo");
   };

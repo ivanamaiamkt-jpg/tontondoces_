@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { CATEGORIES } from "@/lib/menu-data";
-import { getSoldOutProductIds, setProductAvailability } from "@/lib/product-availability";
+import {
+  getAvailabilityState,
+  setProductAvailability,
+  setProductArchived,
+} from "@/lib/product-availability";
 import {
   getProductOverrides,
   getCustomCategories,
@@ -17,7 +21,18 @@ import {
   type CustomProductRow,
 } from "@/lib/menu-overrides";
 import { brl } from "@/lib/format";
-import { Eye, EyeOff, Pencil, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  Eye,
+  EyeOff,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/cardapio")({
@@ -30,6 +45,8 @@ const emptyDraft: ProductDraft = { name: "", description: "", price: "", image_u
 
 function CardapioAdminPage() {
   const [soldOut, setSoldOut] = useState<Set<string>>(new Set());
+  const [archived, setArchived] = useState<Set<string>>(new Set());
+  const [tab, setTab] = useState<"cardapio" | "arquivados">("cardapio");
   const [overrides, setOverrides] = useState<Map<string, ProductOverrideRow>>(new Map());
   const [customCategories, setCustomCategories] = useState<CustomCategoryRow[]>([]);
   const [customProducts, setCustomProducts] = useState<CustomProductRow[]>([]);
@@ -51,13 +68,14 @@ function CardapioAdminPage() {
 
   const load = async () => {
     setLoading(true);
-    const [soldOutRes, overridesRes, customCatsRes, customProdsRes] = await Promise.all([
-      getSoldOutProductIds(),
+    const [availabilityRes, overridesRes, customCatsRes, customProdsRes] = await Promise.all([
+      getAvailabilityState(),
       getProductOverrides(),
       getCustomCategories(),
       getCustomProducts(),
     ]);
-    setSoldOut(soldOutRes);
+    setSoldOut(availabilityRes.soldOut);
+    setArchived(availabilityRes.archived);
     setOverrides(overridesRes);
     setCustomCategories(customCatsRes);
     setCustomProducts(customProdsRes);
@@ -75,6 +93,29 @@ function CardapioAdminPage() {
     if (error) toast.error(error.message);
     else {
       toast.success(currentlySoldOut ? "Marcado como disponível" : "Marcado como esgotado");
+      load();
+    }
+  };
+
+  const archiveProduct = async (productId: string, name: string) => {
+    if (!confirm(`Arquivar "${name}"? Ele some do site e fica na aba Arquivados.`)) return;
+    setPending(productId);
+    const { error } = await setProductArchived(productId, true);
+    setPending(null);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Arquivado");
+      load();
+    }
+  };
+
+  const restoreProduct = async (productId: string) => {
+    setPending(productId);
+    const { error } = await setProductArchived(productId, false);
+    setPending(null);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Restaurado — já aparece no site");
       load();
     }
   };
@@ -234,6 +275,10 @@ function CardapioAdminPage() {
     }
   };
 
+  const archivedProducts = CATEGORIES.flatMap((cat) =>
+    cat.products.filter((p) => archived.has(p.id)).map((p) => ({ p, cat })),
+  );
+
   const triggerUpload = (target: "edit" | "new") => {
     pendingUploadTarget.current = target;
     fileInputRef.current?.click();
@@ -258,7 +303,7 @@ function CardapioAdminPage() {
           <h1 className="font-display text-3xl">Cardápio</h1>
           <p className="text-sm text-muted-foreground">
             Edite nome, preço, descrição e foto de qualquer produto, cadastre produtos e
-            categorias novos, e marque itens como esgotado.
+            categorias novos, marque itens como esgotado ou arquive os que saíram do cardápio.
           </p>
         </div>
         <button
@@ -303,8 +348,61 @@ function CardapioAdminPage() {
         </section>
       )}
 
+      <div className="mb-5 flex gap-1 border-b border-border">
+        {(
+          [
+            ["cardapio", "Cardápio"],
+            ["arquivados", `Arquivados (${archivedProducts.length})`],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${
+              tab === id
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <p className="text-sm text-muted-foreground">Carregando...</p>
+      ) : tab === "arquivados" ? (
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <p className="mb-3 text-sm text-muted-foreground">
+            Produtos que não aparecem no site. Restaure pra eles voltarem ao cardápio.
+          </p>
+          {archivedProducts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum produto arquivado.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {archivedProducts.map(({ p, cat }) => (
+                <li key={p.id} className="flex items-center justify-between gap-3 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-foreground">
+                      {overrides.get(p.id)?.name ?? p.name}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">{cat.title}</p>
+                  </div>
+                  <p className="shrink-0 font-display text-base text-primary">
+                    {brl(overrides.get(p.id)?.price ?? p.price)}
+                  </p>
+                  <button
+                    onClick={() => restoreProduct(p.id)}
+                    disabled={pending === p.id}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-60"
+                  >
+                    <ArchiveRestore className="h-4 w-4" /> Restaurar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       ) : (
         <>
           {CATEGORIES.map((cat) => {
@@ -313,7 +411,7 @@ function CardapioAdminPage() {
               <section key={cat.id} className="mb-6 rounded-2xl border border-border bg-card p-5">
                 <h2 className="mb-3 font-display text-xl">{cat.title}</h2>
                 <ul className="divide-y divide-border">
-                  {cat.products.map((p) => {
+                  {cat.products.filter((p) => !archived.has(p.id)).map((p) => {
                     const isSoldOut = soldOut.has(p.id);
                     const ov = overrides.get(p.id);
                     const isEditing = editingId === p.id;
@@ -363,6 +461,13 @@ function CardapioAdminPage() {
                                 <EyeOff className="h-4 w-4" /> Esgotado
                               </>
                             )}
+                          </button>
+                          <button
+                            onClick={() => archiveProduct(p.id, ov?.name ?? p.name)}
+                            disabled={pending === p.id}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-60"
+                          >
+                            <Archive className="h-4 w-4" /> Arquivar
                           </button>
                         </div>
 

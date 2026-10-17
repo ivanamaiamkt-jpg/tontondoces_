@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Heart, Instagram, MessageCircle } from "lucide-react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { CATEGORIES, type Category } from "@/lib/menu-data";
-import { getSoldOutProductIds } from "@/lib/product-availability";
+import { getAvailabilityState } from "@/lib/product-availability";
 import { getMergedCategories } from "@/lib/menu-overrides";
+import { useMinOrder } from "@/lib/min-order";
+import { brl } from "@/lib/format";
 import { CategoryBanner } from "@/components/tonton/category-banner";
 import { ProductCard } from "@/components/tonton/product-card";
 import { CategoryNav } from "@/components/tonton/category-nav";
@@ -28,6 +30,22 @@ const SocialProofPopup = lazy(() =>
 
 export const Route = createFileRoute("/")({
   component: HomePage,
+  // Esgotados e arquivados já vêm resolvidos no HTML, pra um produto arquivado
+  // nunca aparecer nem por um instante. Se o banco demorar, segue sem eles.
+  loader: async () => {
+    try {
+      const state = await Promise.race([
+        getAvailabilityState(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+      ]);
+      return {
+        soldOut: state ? [...state.soldOut] : [],
+        archived: state ? [...state.archived] : [],
+      };
+    } catch {
+      return { soldOut: [] as string[], archived: [] as string[] };
+    }
+  },
   head: () => ({
     links: [
       { rel: "preload", as: "image", href: heroCups, fetchpriority: "high" } as any,
@@ -37,13 +55,27 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const { cartOpen } = useOrder();
-  const [soldOut, setSoldOut] = useState<Set<string>>(new Set());
-  const [categories, setCategories] = useState<Category[]>(CATEGORIES);
+  const minOrder = useMinOrder();
+  const initial = Route.useLoaderData();
+  const [soldOut, setSoldOut] = useState<Set<string>>(() => new Set(initial.soldOut));
+  const [archived, setArchived] = useState<Set<string>>(() => new Set(initial.archived));
+  const [merged, setMerged] = useState<Category[]>(CATEGORIES);
 
   useEffect(() => {
-    getSoldOutProductIds().then(setSoldOut);
-    getMergedCategories().then(setCategories);
+    getAvailabilityState().then((s) => {
+      setSoldOut(s.soldOut);
+      setArchived(s.archived);
+    });
+    getMergedCategories().then(setMerged);
   }, []);
+
+  const categories = useMemo(
+    () =>
+      merged
+        .map((c) => ({ ...c, products: c.products.filter((p) => !archived.has(p.id)) }))
+        .filter((c) => c.products.length > 0),
+    [merged, archived],
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -131,7 +163,7 @@ function HomePage() {
             <Instagram size={16} strokeWidth={2.2} />
           </a>
           <span aria-hidden>·</span>
-          <span>🛒 Pedido mínimo: R$25,00</span>
+          <span>🛒 Pedido mínimo: {brl(minOrder)}</span>
         </div>
       </section>
 
