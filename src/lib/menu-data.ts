@@ -79,9 +79,9 @@ export const COPO_FLAVORS: Flavor[] = [
   },
   {
     id: "nevadinho",
-    name: "Nevadinho — Mousse de Ninho & Ganache",
+    name: "Nevadinho — Mousse de Ninho",
     description:
-      "Mousse de Ninho aveludada com ganache de chocolate escorrendo por cima.",
+      "Mousse de Ninho aveludada.",
     price: 30.9,
     image: imgNevadinho,
   },
@@ -97,7 +97,7 @@ export const COPO_FLAVORS: Flavor[] = [
     id: "prazer-em-camadas",
     name: "Prazer em Camadas — Brigadeiro Tradicional",
     description:
-      "Brigadeiro no ponto perfeito com ganache brilhante. Chocolate puro, sem enrolação.",
+      "Brigadeiro no ponto perfeito. Chocolate puro, sem enrolação.",
     price: 30.9,
     image: imgPrazerCamadas,
   },
@@ -124,7 +124,7 @@ export const BOMBOM_FLAVORS: Flavor[] = [
     id: "uva-morango",
     name: "Bombom Dois Sabores — Uva e Morango",
     description:
-      "Uvas e morangos frescos afundando em brigadeiro cremoso com ganache espelhada. Impossível comer devagar.",
+      "Uvas e morangos frescos afundando em brigadeiro cremoso. Impossível comer devagar.",
     image: imgBombomMorango2,
   },
   {
@@ -138,7 +138,7 @@ export const BOMBOM_FLAVORS: Flavor[] = [
     id: "ninho-morango",
     name: "Bombom Mousse de Ninho e Morango",
     description:
-      "Mousse de Ninho com morangos suculentos e ganache. Cada colherada é uma surpresa.",
+      "Mousse de Ninho com morangos suculentos. Cada colherada é uma surpresa.",
     image: imgBombomMorango,
   },
 ];
@@ -265,9 +265,9 @@ export const CATEGORIES: Category[] = [
         originalPrice: 35.0,
         badge: "⭐ Mais Vendido",
       }),
-      p("copo-nevadinho", "Nevadinho — Mousse de Ninho & Ganache", 28.9, imgNevadinho, {
+      p("copo-nevadinho", "Nevadinho — Mousse de Ninho", 28.9, imgNevadinho, {
         description:
-          "280g com brownie na base, mousse de Ninho aveludada e ganache de chocolate escorrendo por cima.",
+          "280g com brownie na base e mousse de Ninho aveludada.",
         originalPrice: 35.0,
       }),
       p(
@@ -288,7 +288,7 @@ export const CATEGORIES: Category[] = [
         imgPrazerCamadas,
         {
           description:
-            "280g com brownie na base, brigadeiro no ponto perfeito e ganache brilhante. Chocolate puro, sem enrolação.",
+            "280g com brownie na base e brigadeiro no ponto perfeito. Chocolate puro, sem enrolação.",
           originalPrice: 35.0,
         },
       ),
@@ -317,7 +317,7 @@ export const CATEGORIES: Category[] = [
     products: [
       p("bombom-uva-morango", "Bombom Dois Sabores — Uva e Morango", 28.9, imgBombomMorango2, {
         description:
-          "250g de uvas e morangos frescos afundando em brigadeiro cremoso com ganache espelhada. Impossível comer devagar.",
+          "250g de uvas e morangos frescos afundando em brigadeiro cremoso. Impossível comer devagar.",
       }),
       p("bombom-ninho-uva", "Bombom no Copo — Mousse de Ninho e Uvas", 28.9, imgBombomUva, {
         description:
@@ -325,7 +325,7 @@ export const CATEGORIES: Category[] = [
       }),
       p("bombom-ninho-morango", "Bombom Mousse de Ninho e Morango", 28.9, imgBombomMorango, {
         description:
-          "250g de mousse de Ninho com morangos suculentos e ganache. Cada colherada é uma surpresa.",
+          "250g de mousse de Ninho com morangos suculentos. Cada colherada é uma surpresa.",
       }),
     ],
   },
