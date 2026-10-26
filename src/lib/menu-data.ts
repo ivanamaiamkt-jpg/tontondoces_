@@ -152,7 +152,7 @@ export const BOMBOM_FLAVORS: Flavor[] = [
   },
 ];
 
-/* Copos em promoção: Dupla Tentação e Oreo só existem no de 150 ml; o de 250 ml é o Ferreiro. */
+/* Copos em promoção: Dupla Tentação e Oreo só existem no de 150 ml; o Ferreiro existe nos dois tamanhos. */
 const PROMO_DUPLA_TENTACAO: Flavor = {
   id: "dupla-tentacao",
   name: "Dupla Tentação",
@@ -251,7 +251,7 @@ export const CATEGORIES: Category[] = [
         description: "Escolha o seu sabor.",
         originalPrice: 16,
         badge: "Promoção",
-        flavors: [PROMO_DUPLA_TENTACAO, PROMO_COPO_OREO],
+        flavors: [PROMO_DUPLA_TENTACAO, PROMO_COPO_OREO, PROMO_INSPIRACAO_FERREIRO],
       }),
       p("inspiracao-ferreiro-250", "Inspiração Ferreiro 250 ml", 19.9, imgInspiracaoFerreiro, {
         description: PROMO_INSPIRACAO_FERREIRO.description,
