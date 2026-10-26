@@ -247,7 +247,7 @@ export const CATEGORIES: Category[] = [
             "Morangos fresquinhos no espetinho, cobertos com chocolate branco e cravejados com pedacinhos de morango.",
         },
       ),
-      p("promo-copo-150", "Copo 150 ml", 10.99, imgDuplaTentacao, {
+      p("promo-copo-150", "Copo 150 ml", 12.99, imgDuplaTentacao, {
         description: "Escolha o seu sabor.",
         originalPrice: 16,
         badge: "Promoção",
