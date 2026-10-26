@@ -28,6 +28,15 @@ import imgEspetinhoMorangoChoc from "@/assets/produtos/espetinho-morango-choc.pn
 import imgEspetinhoMorangoNinho from "@/assets/produtos/espetinho-morango-ninho.jpeg";
 import imgMorangoCravejadoTradicional from "@/assets/produtos/morango-cravejado-tradicional.jpeg";
 import imgMorangoCravejadoMaracuja from "@/assets/produtos/morango-cravejado-maracuja.jpeg";
+import imgEspetinhoMorangoCravejado from "@/assets/produtos/espetinho-morango-cravejado.webp";
+import imgDuplaTentacao from "@/assets/produtos/dupla-tentacao.webp";
+import imgCopoOreo from "@/assets/produtos/copo-oreo.webp";
+import imgInspiracaoFerreiro from "@/assets/produtos/inspiracao-ferreiro.webp";
+import imgGeladinhoChocolate from "@/assets/produtos/geladinho-chocolate.webp";
+import imgGeladinhoCoco from "@/assets/produtos/geladinho-coco.webp";
+import imgGeladinhoMaracuja from "@/assets/produtos/geladinho-maracuja.webp";
+import imgGeladinhoNinho from "@/assets/produtos/geladinho-ninho.webp";
+import imgGeladinhoPudim from "@/assets/produtos/geladinho-pudim.webp";
 
 export type Flavor = {
   id: string;
@@ -143,6 +152,64 @@ export const BOMBOM_FLAVORS: Flavor[] = [
   },
 ];
 
+/* Sabores dos copos em promoção (150 ml e 250 ml). O Oreo só existe no de 150 ml. */
+const PROMO_DUPLA_TENTACAO: Flavor = {
+  id: "dupla-tentacao",
+  name: "Dupla Tentação",
+  description: "Creme de Ninho, brigadeiro de Ninho e brigadeiro tradicional em camadas.",
+  image: imgDuplaTentacao,
+};
+const PROMO_COPO_OREO: Flavor = {
+  id: "copo-oreo",
+  name: "Copo de Oreo",
+  description: "Creme de Ninho com Oreo em camadas.",
+  image: imgCopoOreo,
+};
+const PROMO_INSPIRACAO_FERREIRO: Flavor = {
+  id: "inspiracao-ferreiro",
+  name: "Inspiração Ferreiro",
+  description: "Mousse de chocolate, brigadeiro tradicional com amendoim e brownie.",
+  image: imgInspiracaoFerreiro,
+};
+
+const GELADINHO_FLAVORS: Flavor[] = [
+  {
+    id: "chocolate",
+    name: "Chocolate 50% cacau",
+    description:
+      "Para os amantes de chocolate! 🍫🤎 Nosso geladinho gourmet de chocolate 50% cacau é a escolha perfeita para refrescar e adoçar o seu dia!",
+    image: imgGeladinhoChocolate,
+  },
+  {
+    id: "coco-cremoso",
+    name: "Coco cremoso",
+    description:
+      "🥥 Nosso geladinho gourmet de coco é cremoso, delicioso e perfeito para refrescar o seu dia!",
+    image: imgGeladinhoCoco,
+  },
+  {
+    id: "maracuja",
+    name: "Maracujá",
+    description:
+      "Geladinho gourmet de maracujá, super cremoso, refrescante e com aquele sabor irresistível da fruta. 💛🥭",
+    image: imgGeladinhoMaracuja,
+  },
+  {
+    id: "ninho",
+    name: "Leite Ninho",
+    description:
+      "Geladinho gourmet de Leite Ninho! Cremoso, docinho e irresistível! 😍 Aquele sabor que conquista na primeira mordida!",
+    image: imgGeladinhoNinho,
+  },
+  {
+    id: "pudim",
+    name: "Pudim",
+    description:
+      "Geladinho gourmet de pudim, super cremoso e com o delicioso sabor de pudim caseiro. Uma sobremesa geladinha e irresistível! 🍮🤎",
+    image: imgGeladinhoPudim,
+  },
+];
+
 function p(
   id: string,
   name: string,
@@ -170,6 +237,32 @@ export const CATEGORIES: Category[] = [
     title: "Sensação do Momento",
     description: "",
     products: [
+      p(
+        "espetinho-morango-cravejado",
+        "Espetinho de Morango Cravejado",
+        25,
+        imgEspetinhoMorangoCravejado,
+        {
+          description:
+            "Morangos fresquinhos no espetinho, cobertos com chocolate branco e cravejados com pedacinhos de morango.",
+        },
+      ),
+      p("promo-copo-150", "Copo 150 ml", 10.99, imgDuplaTentacao, {
+        description: "Escolha o seu sabor.",
+        originalPrice: 16,
+        badge: "Promoção",
+        flavors: [PROMO_DUPLA_TENTACAO, PROMO_COPO_OREO],
+      }),
+      p("promo-copo-250", "Copo 250 ml", 19.9, imgInspiracaoFerreiro, {
+        description: "Escolha o seu sabor.",
+        originalPrice: 28.9,
+        badge: "Promoção",
+        flavors: [PROMO_DUPLA_TENTACAO, PROMO_INSPIRACAO_FERREIRO],
+      }),
+      p("geladinho-gourmet", "Geladinho Gourmet", 8, imgGeladinhoMaracuja, {
+        description: "Cremoso e geladinho. Escolha o seu sabor.",
+        flavors: GELADINHO_FLAVORS,
+      }),
       p(
         "morango-cravejado-tradicional",
         "Morango Cravejado Tradicional",
