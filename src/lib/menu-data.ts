@@ -351,53 +351,58 @@ export const CATEGORIES: Category[] = [
     description: "",
     badge: "⭐ Mais Vendido",
     products: [
-      p("copo-doce-encanto", "Doce Encanto — Brigadeiro, Ninho, Uva", 28.9, imgDoceEncanto, {
+      p("copo-doce-encanto", "Doce Encanto — Brigadeiro, Ninho, Uva", 19.9, imgDoceEncanto, {
         description:
           "280g de pura felicidade: brownie na base, brigadeiro cremoso, mousse de Ninho e uvas que estouram na boca.",
-        originalPrice: 35.0,
-        badge: "⭐ Mais Vendido",
+        originalPrice: 28.9,
+        badge: "⭐ Mais Vendido · Promoção",
       }),
-      p("copo-nevadinho", "Nevadinho — Mousse de Ninho", 28.9, imgNevadinho, {
+      p("copo-nevadinho", "Nevadinho — Mousse de Ninho", 19.9, imgNevadinho, {
         description:
           "280g com brownie na base e mousse de Ninho aveludada.",
-        originalPrice: 35.0,
+        originalPrice: 28.9,
+        badge: "Promoção",
       }),
       p(
         "copo-pecado-em-dobro",
         "Pecado em Dobro | Brigadeiro & Mousse de Ninho",
-        28.9,
+        19.9,
         imgNevadinho2,
         {
           description:
             "280g com brownie na base, brigadeiro e mousse de Ninho em camadas que se fundem na colher. Pecado assumido, sem arrependimento.",
-          originalPrice: 35.0,
+          originalPrice: 28.9,
+          badge: "Promoção",
         },
       ),
       p(
         "copo-prazer-em-camadas",
         "Prazer em Camadas — Brigadeiro Tradicional",
-        28.9,
+        19.9,
         imgPrazerCamadas,
         {
           description:
             "280g com brownie na base e brigadeiro no ponto perfeito. Chocolate puro, sem enrolação.",
-          originalPrice: 35.0,
+          originalPrice: 28.9,
+          badge: "Promoção",
         },
       ),
-      p("copo-merengue", "Copo Merengue", 28.9, imgCopoMerengue, {
+      p("copo-merengue", "Copo Merengue", 19.9, imgCopoMerengue, {
         description:
           "280g de creme branco sedoso, brigadeiro cremoso, morangos fresquinhos. Texturas que vão te surpreender.",
-        originalPrice: 35.0,
+        originalPrice: 28.9,
+        badge: "Promoção",
       }),
       p(
         "copo-doce-paixao",
         "Copo Doce Paixão — Brigadeiro, Ninho e Morango",
-        28.9,
+        19.9,
         imgCopoConforto,
         {
           description:
             "280g com brownie na base, brigadeiro, mousse de Ninho e morangos suculentos em camadas. O combo que virou vício.",
-          originalPrice: 35.0,
+          originalPrice: 28.9,
+          badge: "Promoção",
         },
       ),
     ],
