@@ -199,8 +199,10 @@
 }
 
 @media (max-width: 640px) {
+  /* altura mínima (e não fixa): a frase de entrega é maior e não pode ficar cortada */
   .hero-tonton {
-    height: 220px;
+    height: auto;
+    min-height: 220px;
   }
   .hero-tonton-left {
     padding: 16px 14px;

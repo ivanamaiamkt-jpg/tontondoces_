@@ -52,14 +52,14 @@ export async function recordVisit() {
   if (!session_id) return;
   const utm = getStoredUtm();
   try {
-    await supabase.from("site_visits" as never).upsert(
-      {
-        session_id,
-        ...utm,
-        landing_path: window.location.pathname,
-      } as never,
-      { onConflict: "session_id", ignoreDuplicates: true } as never,
-    );
+    // insert simples (upsert/ON CONFLICT é barrado pela política de segurança da tabela e a
+    // visita nunca era gravada). 23505 = esse visitante já foi registrado antes: tudo certo.
+    const { error } = (await supabase.from("site_visits" as never).insert({
+      session_id,
+      ...utm,
+      landing_path: window.location.pathname,
+    } as never)) as unknown as { error: { code?: string } | null };
+    if (error && error.code !== "23505") throw error;
     sessionStorage.setItem(VISIT_RECORDED_KEY, "1");
   } catch (e) {
     console.error("recordVisit error:", e);

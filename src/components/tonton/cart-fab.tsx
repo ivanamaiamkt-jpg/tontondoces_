@@ -2,8 +2,11 @@ import { ShoppingBag } from "lucide-react";
 import { useOrder } from "@/contexts/order-context";
 
 export function CartFab() {
-  const { items, setCartOpen } = useOrder();
+  const { items, cartOpen, setCartOpen } = useOrder();
   const count = items.reduce((s, it) => s + it.quantity, 0);
+
+  // Com o carrinho aberto o botão sairia por cima do X de fechar (no celular o carrinho ocupa a tela toda).
+  if (cartOpen) return null;
 
   return (
     <button

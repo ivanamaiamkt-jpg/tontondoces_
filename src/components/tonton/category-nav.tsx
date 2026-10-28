@@ -5,7 +5,6 @@ export function CategoryNav({ categories = CATEGORIES }: { categories?: Category
   const [activeId, setActiveId] = useState<string>(categories[0]?.id ?? "");
   const navRef = useRef<HTMLDivElement>(null);
 
-
   // Observa qual seção está visível
   useEffect(() => {
     const observers: IntersectionObserver[] = [];
@@ -39,9 +38,7 @@ export function CategoryNav({ categories = CATEGORIES }: { categories?: Category
   useEffect(() => {
     const nav = navRef.current;
     if (!nav) return;
-    const activeBtn = nav.querySelector<HTMLAnchorElement>(
-      `a[data-cat-id="${activeId}"]`,
-    );
+    const activeBtn = nav.querySelector<HTMLAnchorElement>(`a[data-cat-id="${activeId}"]`);
     if (activeBtn) {
       activeBtn.scrollIntoView({
         behavior: "smooth",
@@ -63,28 +60,31 @@ export function CategoryNav({ categories = CATEGORIES }: { categories?: Category
 
   return (
     <nav className="sticky top-0 z-30 border-b border-border/60 bg-background/95 backdrop-blur">
-      <div
-        ref={navRef}
-        className="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {categories.map((cat) => {
-          const active = cat.id === activeId;
-          return (
-            <a
-              key={cat.id}
-              href={`#cat-${cat.id}`}
-              data-cat-id={cat.id}
-              onClick={(e) => handleClick(e, cat.id)}
-              className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition ${
-                active
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-foreground/70 hover:text-primary"
-              }`}
-            >
-              {cat.title}
-            </a>
-          );
-        })}
+      {/* pr-24/pr-40: o botão flutuante do carrinho fica por cima da barra; as abas rolam só até antes dele */}
+      <div className="mx-auto max-w-5xl pr-24 sm:pr-40 xl:pr-0">
+        <div
+          ref={navRef}
+          className="flex gap-1 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {categories.map((cat) => {
+            const active = cat.id === activeId;
+            return (
+              <a
+                key={cat.id}
+                href={`#cat-${cat.id}`}
+                data-cat-id={cat.id}
+                onClick={(e) => handleClick(e, cat.id)}
+                className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition ${
+                  active
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-foreground/70 hover:text-primary"
+                }`}
+              >
+                {cat.title}
+              </a>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );
