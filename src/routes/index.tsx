@@ -5,6 +5,7 @@ import { CATEGORIES, type Category } from "@/lib/menu-data";
 import { getAvailabilityState } from "@/lib/product-availability";
 import { getMergedCategories } from "@/lib/menu-overrides";
 import { useMinOrder } from "@/lib/min-order";
+import { useDeliverySettings } from "@/lib/delivery";
 import { brl } from "@/lib/format";
 import { CategoryBanner } from "@/components/tonton/category-banner";
 import { ProductCard } from "@/components/tonton/product-card";
@@ -56,6 +57,7 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const { cartOpen } = useOrder();
   const minOrder = useMinOrder();
+  const delivery = useDeliverySettings();
   const initial = Route.useLoaderData();
   const [soldOut, setSoldOut] = useState<Set<string>>(() => new Set(initial.soldOut));
   const [archived, setArchived] = useState<Set<string>>(() => new Set(initial.archived));
@@ -104,7 +106,11 @@ function HomePage() {
           <h2 className="hero-tonton-title">
             Brigadeiros absurdamente cremosos, prontinhos pra você buscar
           </h2>
-          <p className="hero-tonton-sub">📍 Retirada na Vila Mineirão, Sorocaba</p>
+          <p className="hero-tonton-sub">
+            {delivery.enabled
+              ? `📍 Entrega em até ${delivery.maxKm} km (em média ${delivery.etaMin} min) ou retirada na Vila Mineirão`
+              : "📍 Retirada na Vila Mineirão, Sorocaba"}
+          </p>
 
         </div>
         <div className="hero-tonton-right">

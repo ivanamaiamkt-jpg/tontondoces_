@@ -1,9 +1,28 @@
-import { useEffect, useState } from "react";
-import { X, Check, Heart, Copy, MessageCircle, ArrowLeft, Store, Car } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  X,
+  Check,
+  Heart,
+  Copy,
+  MessageCircle,
+  ArrowLeft,
+  Store,
+  Car,
+  Bike,
+  Loader2,
+} from "lucide-react";
 import { useOrder } from "@/contexts/order-context";
 import { OWNER_WHATSAPP, STORE_ADDRESS } from "@/lib/menu-data";
 import { useMinOrder } from "@/lib/min-order";
-import { brl, maskPhone } from "@/lib/format";
+import { brl, maskPhone, maskCep } from "@/lib/format";
+import {
+  lookupCepClient,
+  quoteDelivery,
+  useDeliverySettings,
+  SOROCABA_IBGE,
+  type CepInfo,
+  type DeliveryQuote,
+} from "@/lib/delivery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,23 +37,40 @@ import { isPaused, PAUSE_WHATSAPP_NOTE } from "@/lib/pause-mode";
 
 const PIX_KEY = "diretorios.tonton@gmail.com";
 
-type Receiving = "pickup" | "uber";
+type Receiving = "pickup" | "uber" | "delivery";
+
+type CepState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "notfound" }
+  | { kind: "error" }
+  | { kind: "ok"; info: CepInfo }
+  | { kind: "othercity"; info: CepInfo };
+
+type QuoteState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "done"; quote: DeliveryQuote }
+  | { kind: "error" };
 
 const STEP_LABELS = ["Quem é você?", "Como você quer receber?", "Confirmar pedido"];
 
 const RECEIVING_WHATSAPP: Record<Receiving, string> = {
   pickup: "Retirada na loja",
   uber: "Uber (cliente chama quando avisarmos)",
+  delivery: "Entrega",
 };
 
 const RECEIVING_SUMMARY: Record<Receiving, string> = {
   pickup: "Retirada na loja",
   uber: "Uber (você chama)",
+  delivery: "Entrega",
 };
 
 export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { items, subtotal, total, clearCart, setCartOpen, customer } = useOrder();
+  const { items, subtotal, clearCart, setCartOpen, customer } = useOrder();
   const MIN_ORDER = useMinOrder();
+  const delivery = useDeliverySettings();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [name, setName] = useState(customer?.name ?? "");
@@ -42,6 +78,14 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
   const [receiving, setReceiving] = useState<Receiving | null>(null);
   const [payment, setPayment] = useState<"pix" | "maquininha">("pix");
   const [notes, setNotes] = useState("");
+  const [cep, setCep] = useState("");
+  const [cepState, setCepState] = useState<CepState>({ kind: "idle" });
+  const [streetTyped, setStreetTyped] = useState("");
+  const [number, setNumber] = useState("");
+  const [complement, setComplement] = useState("");
+  const [quoteState, setQuoteState] = useState<QuoteState>({ kind: "idle" });
+  const cepSeq = useRef(0);
+  const quoteSeq = useRef(0);
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState<{
     orderId: string;
@@ -50,6 +94,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     name: string;
     summary: string;
     receiving: Receiving;
+    addressLine?: string;
   } | null>(null);
   const [sent, setSent] = useState(false);
   const [storeStatus, setStoreStatus] = useState(() => getStoreStatus());
@@ -65,11 +110,67 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customer?.name, customer?.phone]);
 
+  // Consulta o CEP assim que tiver 8 dígitos (só preenche a tela; quem decide é o servidor).
+  const handleCepChange = (v: string) => {
+    const masked = maskCep(v);
+    setCep(masked);
+    setQuoteState({ kind: "idle" });
+    const digits = masked.replace(/\D/g, "");
+    if (digits.length !== 8) {
+      cepSeq.current++;
+      setCepState({ kind: "idle" });
+      return;
+    }
+    const seq = ++cepSeq.current;
+    setCepState({ kind: "loading" });
+    lookupCepClient(digits)
+      .then((info) => {
+        if (seq !== cepSeq.current) return;
+        if (!info) return setCepState({ kind: "notfound" });
+        const inSorocaba = info.ibge === SOROCABA_IBGE && info.state.toUpperCase() === "SP";
+        setStreetTyped(info.street);
+        setCepState(inSorocaba ? { kind: "ok", info } : { kind: "othercity", info });
+      })
+      .catch(() => {
+        if (seq === cepSeq.current) setCepState({ kind: "error" });
+      });
+  };
+
+  // Calcula a taxa quando CEP + número estão preenchidos (espera o cliente parar de digitar).
+  const cepDigits = cep.replace(/\D/g, "");
+  const cepOk = cepState.kind === "ok";
+  useEffect(() => {
+    if (receiving !== "delivery" || !cepOk || number.trim() === "" || streetTyped.trim() === "") {
+      quoteSeq.current++;
+      setQuoteState({ kind: "idle" });
+      return;
+    }
+    const seq = ++quoteSeq.current;
+    setQuoteState({ kind: "loading" });
+    const timer = setTimeout(() => {
+      quoteDelivery({ data: { cep: cepDigits, number: number.trim(), street: streetTyped.trim() } })
+        .then((quote) => {
+          if (seq === quoteSeq.current) setQuoteState({ kind: "done", quote });
+        })
+        .catch(() => {
+          if (seq === quoteSeq.current) setQuoteState({ kind: "error" });
+        });
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [receiving, cepOk, cepDigits, number, streetTyped]);
+
   if (!open) return null;
 
   const phoneDigits = phone.replace(/\D/g, "");
   const step1Valid = name.trim().length >= 2 && phoneDigits.length >= 10;
-  const step2Valid = receiving !== null;
+  const approvedQuote =
+    quoteState.kind === "done" && quoteState.quote.status === "ok" ? quoteState.quote : null;
+  const deliveryFee = receiving === "delivery" && approvedQuote ? approvedQuote.fee : 0;
+  const total = subtotal + deliveryFee;
+  const step2Valid =
+    receiving === "pickup" ||
+    receiving === "uber" ||
+    (receiving === "delivery" && approvedQuote !== null);
   // Com Uber o pagamento é sempre PIX adiantado (o motorista não leva maquininha).
   const effectivePayment: "pix" | "maquininha" = receiving === "uber" ? "pix" : payment;
 
@@ -78,8 +179,22 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     if (r === "uber") setPayment("pix");
   };
 
+  const addressLine =
+    receiving === "delivery" && approvedQuote
+      ? `${approvedQuote.address.street}, ${number.trim()}${complement.trim() ? ` — ${complement.trim()}` : ""} — ${approvedQuote.address.neighborhood} — ${approvedQuote.address.city} — CEP ${approvedQuote.address.cep}`
+      : "";
+
+  const whatsappConfirmLink = () => {
+    const info = cepState.kind === "ok" || cepState.kind === "othercity" ? cepState.info : null;
+    const msg =
+      `Oi TonTon! 💜 Quero pedir com entrega, mas o site não conseguiu calcular a taxa.\n` +
+      `CEP: ${cep}${info?.street ? ` — ${info.street}` : ""}, nº ${number || "?"}${complement ? ` (${complement})` : ""}\n` +
+      `Pode confirmar a taxa pra mim?`;
+    return `https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent(msg)}`;
+  };
+
   const handleSubmit = async () => {
-    if (!step1Valid || !receiving || submitting || subtotal < MIN_ORDER) return;
+    if (!step1Valid || !receiving || !step2Valid || submitting || subtotal < MIN_ORDER) return;
     setSubmitting(true);
     const orderId = `TT-${Date.now().toString().slice(-6)}`;
 
@@ -90,9 +205,20 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
         customer_name: name,
         customer_phone: phoneDigits,
         delivery_mode: receiving,
+        ...(receiving === "delivery" && approvedQuote
+          ? {
+              street: approvedQuote.address.street,
+              number: number.trim(),
+              complement: complement.trim() || null,
+              neighborhood: approvedQuote.address.neighborhood,
+              city: approvedQuote.address.city,
+              cep: approvedQuote.address.cep,
+              delivery_km: approvedQuote.km,
+            }
+          : {}),
         items: items as unknown as object,
         subtotal,
-        delivery_fee: 0,
+        delivery_fee: deliveryFee,
         total,
         payment_method: effectivePayment,
         notes: notes || null,
@@ -118,10 +244,17 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     });
     lines.push("");
     lines.push(`*Recebimento:* ${RECEIVING_WHATSAPP[receiving]}`);
+    if (receiving === "delivery" && approvedQuote) {
+      lines.push(`*Endereço:* ${addressLine}`);
+      lines.push(
+        `*Taxa de entrega:* ${brl(deliveryFee)} (${String(approvedQuote.km).replace(".", ",")} km${approvedQuote.precise ? "" : ", distância estimada"})`,
+      );
+      lines.push(`*Subtotal:* ${brl(subtotal)}`);
+    }
     lines.push(`*Total:* ${brl(total)}`);
     lines.push("");
     lines.push(
-      `*Pagamento:* ${effectivePayment === "pix" ? "PIX (chave enviada após confirmação)" : "Cartão (débito ou crédito na retirada)"}`,
+      `*Pagamento:* ${effectivePayment === "pix" ? "PIX (chave enviada após confirmação)" : receiving === "delivery" ? "Cartão (débito ou crédito na entrega)" : "Cartão (débito ou crédito na retirada)"}`,
     );
     if (notes) lines.push(`*Observações:* ${notes}`);
     if (isPaused()) {
@@ -145,7 +278,15 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
       void syncAbandonedCart({ nome: name, telefone: phoneDigits, items });
     }
 
-    setConfirmed({ orderId, payment: effectivePayment, total, name, summary, receiving });
+    setConfirmed({
+      orderId,
+      payment: effectivePayment,
+      total,
+      name,
+      summary,
+      receiving,
+      addressLine: addressLine || undefined,
+    });
     setSent(false);
     setSubmitting(false);
   };
@@ -257,7 +398,13 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
               <strong>{brl(confirmed.total)}</strong>
               <br />
               Forma de pagamento:{" "}
-              <strong>{confirmed.payment === "pix" ? "PIX" : "Cartão na retirada"}</strong>
+              <strong>
+                {confirmed.payment === "pix"
+                  ? "PIX"
+                  : confirmed.receiving === "delivery"
+                    ? "Cartão na entrega"
+                    : "Cartão na retirada"}
+              </strong>
             </p>
 
             {confirmed.payment === "pix" && (
@@ -284,10 +431,23 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
 
             {confirmed.payment === "maquininha" && (
               <div className="mt-5 rounded-2xl border border-gold/40 bg-gold/10 p-4 text-left text-sm text-chocolate">
-                💳 Pagamento na retirada — débito ou crédito na maquininha.
+                {confirmed.receiving === "delivery"
+                  ? "💳 Pagamento na entrega — débito ou crédito na maquininha."
+                  : "💳 Pagamento na retirada — débito ou crédito na maquininha."}
               </div>
             )}
 
+            {confirmed.receiving === "delivery" ? (
+              <div className="mt-5 rounded-2xl border-2 border-primary/30 bg-primary/5 p-4 text-left">
+                <p className="font-display text-sm font-semibold text-primary">
+                  🛵 Entrega — em média {delivery.etaMin} minutos
+                </p>
+                <p className="mt-2 text-sm text-foreground">{confirmed.addressLine}</p>
+                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                  Avisamos no WhatsApp quando o pedido sair 💕
+                </p>
+              </div>
+            ) : (
             <div className="mt-5 rounded-2xl border-2 border-primary/30 bg-primary/5 p-4 text-left">
               <p className="font-display text-sm font-semibold text-primary">
                 {confirmed.receiving === "uber"
@@ -312,6 +472,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                   : "Avisamos no WhatsApp quando estiver pronto 💕"}
               </p>
             </div>
+            )}
 
             {!sent ? (
               <>
@@ -386,6 +547,164 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
 
               {step === 2 && (
                 <div className="space-y-3">
+                  {delivery.enabled && (
+                    <>
+                      <button
+                        type="button"
+                        aria-pressed={receiving === "delivery"}
+                        onClick={() => chooseReceiving("delivery")}
+                        className={optionCls(receiving === "delivery")}
+                      >
+                        <div className="flex items-start gap-3">
+                          <Bike className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                          <div>
+                            <div className="font-semibold text-foreground">Entrega</div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">
+                              Entrega própria — em média {delivery.etaMin} minutos. Taxa
+                              calculada pelo seu endereço (até {delivery.maxKm} km da loja).
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+
+                      {receiving === "delivery" && (
+                        <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
+                          <div>
+                            <Label>CEP *</Label>
+                            <Input
+                              value={cep}
+                              onChange={(e) => handleCepChange(e.target.value)}
+                              className="mt-1"
+                              placeholder="00000-000"
+                              inputMode="numeric"
+                              autoComplete="postal-code"
+                            />
+                            {cepState.kind === "loading" && (
+                              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                                <Loader2 className="h-3 w-3 animate-spin" /> Buscando o CEP...
+                              </p>
+                            )}
+                            {cepState.kind === "notfound" && (
+                              <p className="mt-1 text-xs text-destructive">
+                                CEP não encontrado. Confere o número?
+                              </p>
+                            )}
+                            {cepState.kind === "error" && (
+                              <p className="mt-1 text-xs text-destructive">
+                                Não consegui consultar o CEP. Tenta de novo?
+                              </p>
+                            )}
+                          </div>
+
+                          {cepState.kind === "othercity" && (
+                            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                              Entregamos só em Sorocaba. Pra outra cidade, você pode chamar um Uber.
+                            </div>
+                          )}
+
+                          {cepState.kind === "ok" && (
+                            <>
+                              <div>
+                                <Label>Rua *</Label>
+                                <Input
+                                  value={streetTyped}
+                                  onChange={(e) => setStreetTyped(e.target.value)}
+                                  readOnly={cepState.info.street !== ""}
+                                  className="mt-1"
+                                  placeholder="Nome da rua"
+                                />
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {cepState.info.neighborhood} · {cepState.info.city}/
+                                  {cepState.info.state}
+                                </p>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label>Número *</Label>
+                                  <Input
+                                    value={number}
+                                    onChange={(e) => setNumber(e.target.value.slice(0, 12))}
+                                    className="mt-1"
+                                    placeholder="123"
+                                    inputMode="numeric"
+                                  />
+                                </div>
+                                <div>
+                                  <Label>Complemento</Label>
+                                  <Input
+                                    value={complement}
+                                    onChange={(e) => setComplement(e.target.value)}
+                                    className="mt-1"
+                                    placeholder="Apto, bloco..."
+                                  />
+                                </div>
+                              </div>
+                            </>
+                          )}
+
+                          {quoteState.kind === "loading" && (
+                            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" /> Calculando a taxa de
+                              entrega...
+                            </p>
+                          )}
+                          {quoteState.kind === "error" && (
+                            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                              Não consegui calcular a taxa agora. Tenta de novo em instantes, ou
+                              chama a gente no WhatsApp.
+                            </div>
+                          )}
+                          {quoteState.kind === "done" && quoteState.quote.status === "ok" && (
+                            <div className="rounded-xl border border-green-300 bg-green-50 px-3 py-2.5 text-sm font-medium text-green-800">
+                              Entrega para {quoteState.quote.address.neighborhood}:{" "}
+                              <strong>{brl(quoteState.quote.fee)}</strong> (
+                              {String(quoteState.quote.km).replace(".", ",")} km). Tempo médio:{" "}
+                              {delivery.etaMin} minutos.
+                            </div>
+                          )}
+                          {quoteState.kind === "done" &&
+                            quoteState.quote.status === "out" &&
+                            quoteState.quote.reason === "distancia" && (
+                              <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                                Esse endereço fica fora da nossa área de entrega (até{" "}
+                                {delivery.maxKm} km da loja). Você pode retirar na loja ou chamar
+                                um Uber.
+                              </div>
+                            )}
+                          {quoteState.kind === "done" &&
+                            quoteState.quote.status === "out" &&
+                            quoteState.quote.reason === "cidade" && (
+                              <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                                Entregamos só em Sorocaba. Pra outra cidade, você pode chamar um
+                                Uber.
+                              </div>
+                            )}
+                          {quoteState.kind === "done" && quoteState.quote.status === "invalid" && (
+                            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                              Confere o CEP e o número do endereço.
+                            </div>
+                          )}
+                          {quoteState.kind === "done" && quoteState.quote.status === "confirm" && (
+                            <div className="space-y-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                              <p>
+                                Não consegui confirmar a distância desse endereço. Chama a gente
+                                no WhatsApp que a gente confirma a taxa, ou escolhe retirar ou
+                                Uber.
+                              </p>
+                              <a
+                                href={whatsappConfirmLink()}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1fb955]"
+                              >
+                                <MessageCircle className="h-3.5 w-3.5" /> Confirmar pelo WhatsApp
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
                   <button
                     type="button"
                     aria-pressed={receiving === "pickup"}
@@ -461,7 +780,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                           Chave enviada após confirmação do pedido
                         </div>
                       </button>
-                      {receiving === "pickup" && (
+                      {(receiving === "pickup" || receiving === "delivery") && (
                         <button
                           type="button"
                           onClick={() => setPayment("maquininha")}
@@ -473,7 +792,9 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                         >
                           <div className="font-semibold text-foreground">💳 Cartão</div>
                           <div className="text-xs text-muted-foreground">
-                            Débito ou crédito na retirada
+                            {receiving === "delivery"
+                              ? "Débito ou crédito na entrega"
+                              : "Débito ou crédito na retirada"}
                           </div>
                         </button>
                       )}
@@ -502,6 +823,26 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                         <dt className="text-muted-foreground">Recebimento</dt>
                         <dd>{RECEIVING_SUMMARY[receiving]}</dd>
                       </div>
+                      {receiving === "delivery" && approvedQuote && (
+                        <>
+                          <div className="flex justify-between gap-3">
+                            <dt className="text-muted-foreground">Endereço</dt>
+                            <dd className="text-right text-xs">{addressLine}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">Subtotal</dt>
+                            <dd>{brl(subtotal)}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">Taxa de entrega</dt>
+                            <dd>{brl(deliveryFee)}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-muted-foreground">Tempo médio</dt>
+                            <dd>{delivery.etaMin} minutos</dd>
+                          </div>
+                        </>
+                      )}
                       <div className="flex justify-between border-t border-border pt-2 text-base font-semibold">
                         <dt>Total</dt>
                         <dd className="font-display text-lg text-primary">{brl(total)}</dd>

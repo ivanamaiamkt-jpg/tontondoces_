@@ -55,6 +55,8 @@ type Order = {
   payment_method: string;
   subtotal: number;
   delivery_fee: number;
+  delivery_km: number | null;
+  cep: string | null;
   total: number;
   notes: string | null;
   notes_internal: string | null;
@@ -77,6 +79,7 @@ const COLUMNS: ColumnDef[] = [
   { id: "novo", title: "Novo", emoji: "🆕", bg: "#fff8e1", headerBg: "#f59e0b", headerText: "#fff" },
   { id: "em_producao", title: "Em produção", emoji: "👩‍🍳", bg: "#e7f1ff", headerBg: "#2563eb", headerText: "#fff" },
   { id: "aguardando_entrega", title: "Pronto", emoji: "📦", bg: "#fef3c7", headerBg: "#d97706", headerText: "#fff" },
+  { id: "na_rua", title: "Na rua", emoji: "🛵", bg: "#ecfeff", headerBg: "#0891b2", headerText: "#fff" },
   { id: "entregue", title: "Entregue", emoji: "✅", bg: "#eef0f2", headerBg: "#6b7280", headerText: "#fff" },
 ];
 
@@ -142,15 +145,32 @@ function buildAcceptMsg(o: Order) {
 
 function buildReadyMsg(o: Order) {
   const first = o.customer_name.split(" ")[0];
+  const isDelivery = o.delivery_mode === "delivery";
   const pay =
     o.payment_method === "pix"
       ? `\n\nChave PIX: ${PIX_KEY}\nValor: ${brl(Number(o.total))}`
-      : `\n\nPagamento na retirada na maquininha 💳`;
+      : isDelivery
+        ? `\n\nPagamento na entrega na maquininha 💳`
+        : `\n\nPagamento na retirada na maquininha 💳`;
   const ready =
     o.delivery_mode === "uber"
       ? `Oi ${first}! 🍫 Seu pedido #${o.order_number} está prontinho! Pode chamar o Uber agora e colar este endereço: ${STORE_ADDRESS_SHORT}, Sorocaba. 💕`
-      : `Oi ${first}! 🍫 Seu pedido #${o.order_number} está prontinho! Pode vir retirar: ${STORE_ADDRESS_SHORT}. 💕`;
+      : isDelivery
+        ? `Oi ${first}! 🍫 Seu pedido #${o.order_number} está prontinho e já vamos providenciar a entrega! 💕`
+        : `Oi ${first}! 🍫 Seu pedido #${o.order_number} está prontinho! Pode vir retirar: ${STORE_ADDRESS_SHORT}. 💕`;
   return `${ready}${pay}`;
+}
+
+function buildMotoboyMsg(o: Order) {
+  const enderecoLine =
+    o.delivery_mode === "delivery"
+      ? `${o.street ?? ""}, ${o.number ?? ""}${o.complement ? ` — ${o.complement}` : ""} — ${o.neighborhood ?? ""} — ${o.city ?? ""}`
+      : "Retirada no local";
+  const pagamentoLine =
+    o.payment_method === "pix" ? "PIX (já pago)" : "Maquininha (cobrar na entrega)";
+  const link =
+    typeof window !== "undefined" ? `${window.location.origin}/entrega/${o.id}` : "";
+  return `🛵 Nova entrega — TonTon Doces\n${o.customer_name} — ${brl(Number(o.total))} (${pagamentoLine})\n\n📍 ${enderecoLine}\n\nVer pedido completo:\n${link}`;
 }
 
 function receivingLabel(o: Order) {
@@ -171,6 +191,7 @@ type CardHandlers = {
   onReject: (o: Order) => void;
   onReady: (o: Order) => void;
   onNotify: (o: Order) => void;
+  onDispatch: (o: Order) => void;
   onDelivered: (o: Order) => void;
   onAskReview: (o: Order) => void;
   onRemove: (id: string) => void;
@@ -228,21 +249,37 @@ function OrderCardBody({ order: o, colId, h }: { order: Order; colId: string; h:
             <Check className="h-3 w-3" /> Pronto
           </button>
         )}
-        {colId === "aguardando_entrega" && (
-          <>
+        {colId === "aguardando_entrega" &&
+          (o.delivery_mode === "delivery" ? (
             <button
-              onClick={() => h.onNotify(o)}
+              onClick={() => h.onDispatch(o)}
               className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-amber-700"
             >
-              <MessageCircle className="h-3 w-3" /> Avisar cliente
+              <MessageCircle className="h-3 w-3" /> Enviar pro motoboy
             </button>
-            <button
-              onClick={() => h.onDelivered(o)}
-              className="inline-flex items-center gap-1 rounded-md bg-gray-700 px-2 py-1 text-[11px] font-semibold text-white hover:bg-gray-800"
-            >
-              <Check className="h-3 w-3" /> Entregue
-            </button>
-          </>
+          ) : (
+            <>
+              <button
+                onClick={() => h.onNotify(o)}
+                className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-amber-700"
+              >
+                <MessageCircle className="h-3 w-3" /> Avisar cliente
+              </button>
+              <button
+                onClick={() => h.onDelivered(o)}
+                className="inline-flex items-center gap-1 rounded-md bg-gray-700 px-2 py-1 text-[11px] font-semibold text-white hover:bg-gray-800"
+              >
+                <Check className="h-3 w-3" /> Entregue
+              </button>
+            </>
+          ))}
+        {colId === "na_rua" && (
+          <button
+            onClick={() => h.onDelivered(o)}
+            className="inline-flex items-center gap-1 rounded-md bg-gray-700 px-2 py-1 text-[11px] font-semibold text-white hover:bg-gray-800"
+          >
+            <Check className="h-3 w-3" /> Entregue
+          </button>
         )}
         {colId === "entregue" && (
           <button
@@ -329,6 +366,7 @@ function PedidosPage() {
   const [detail, setDetail] = useState<Order | null>(null);
   const [banner, setBanner] = useState<{ name: string; total: number } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [motoboyWhatsapp, setMotoboyWhatsapp] = useState<string>("");
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -337,6 +375,17 @@ function PedidosPage() {
   const knownIds = useRef<Set<string>>(new Set());
   const firstLoad = useRef(true);
   const originalTitle = useRef<string>("");
+
+  useEffect(() => {
+    (async () => {
+      const { data } = (await supabase
+        .from("store_settings" as never)
+        .select("value")
+        .eq("key", "motoboy_whatsapp")
+        .maybeSingle()) as unknown as { data: { value: string } | null };
+      if (data?.value) setMotoboyWhatsapp(data.value);
+    })();
+  }, []);
 
   // Tick para "há X min"
   useEffect(() => {
@@ -401,6 +450,7 @@ function PedidosPage() {
       novo: [],
       em_producao: [],
       aguardando_entrega: [],
+      na_rua: [],
       entregue: [],
     };
     orders.forEach((o) => {
@@ -466,6 +516,15 @@ function PedidosPage() {
     window.open(waLink(o.customer_phone, buildReadyMsg(o)), "_blank");
   };
 
+  const handleDispatch = (o: Order) => {
+    if (!motoboyWhatsapp) {
+      toast.error("Cadastre o WhatsApp do motoboy em Configurações.");
+      return;
+    }
+    updateStatus(o.id, "na_rua");
+    window.open(waLink(motoboyWhatsapp, buildMotoboyMsg(o)), "_blank");
+  };
+
   const handleDelivered = (o: Order) => updateStatus(o.id, "entregue");
 
   const markPosVenda = async (o: Order, pos_venda_feito: boolean) => {
@@ -492,6 +551,7 @@ function PedidosPage() {
     onReject: handleReject,
     onReady: handleReady,
     onNotify: handleNotify,
+    onDispatch: handleDispatch,
     onDelivered: handleDelivered,
     onAskReview: handleAskReview,
     onRemove: remove,
@@ -522,7 +582,7 @@ function PedidosPage() {
       ) : (
         <div className="-mx-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="flex min-w-max gap-3 sm:grid sm:min-w-0 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="flex min-w-max gap-3 sm:grid sm:min-w-0 sm:grid-cols-2 lg:grid-cols-5">
               {COLUMNS.map((col) => (
                 <KanbanColumn key={col.id} col={col} orders={grouped[col.id] ?? []} h={cardHandlers} />
               ))}
@@ -591,8 +651,17 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
             </ul>
           </section>
 
-          <section>
-            <p className="font-display text-lg text-primary">
+          <section className="grid grid-cols-2 gap-2">
+            <p>
+              <span className="text-muted-foreground">Subtotal:</span> {brl(Number(order.subtotal))}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Entrega:</span>{" "}
+              {order.delivery_mode === "delivery"
+                ? `${brl(Number(order.delivery_fee))}${order.delivery_km ? ` (${String(order.delivery_km).replace(".", ",")} km)` : ""}`
+                : "—"}
+            </p>
+            <p className="col-span-2 font-display text-lg text-primary">
               Total: {brl(Number(order.total))}
             </p>
           </section>
@@ -605,6 +674,7 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
                 {order.complement ? ` — ${order.complement}` : ""}
                 {order.neighborhood ? ` · ${order.neighborhood}` : ""}
                 {order.city ? ` · ${order.city}` : ""}
+                {order.cep ? ` · CEP ${order.cep}` : ""}
               </p>
             ) : order.delivery_mode === "uber" ? (
               <p className="text-foreground">
@@ -618,7 +688,11 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
           <section>
             <p className="text-xs font-semibold uppercase text-muted-foreground">Pagamento</p>
             <p className="text-foreground">
-              {order.payment_method === "pix" ? "PIX" : "Cartão (na retirada)"}
+              {order.payment_method === "pix"
+                ? "PIX"
+                : order.delivery_mode === "delivery"
+                  ? "Cartão (na entrega)"
+                  : "Cartão (na retirada)"}
             </p>
           </section>
 
