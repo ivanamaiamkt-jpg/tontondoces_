@@ -17,6 +17,7 @@ import { useMinOrder } from "@/lib/min-order";
 import { PAIR_PROMO_LABEL } from "@/lib/pair-promo";
 import { PAYMENTS_BY_RECEIVING, type PaymentMethod } from "@/lib/payment";
 import { giftOrderItem, GIFT_LABEL, useGiftMin } from "@/lib/gift";
+import { rememberOrderId } from "@/lib/my-orders";
 import { brl, maskPhone, maskCep } from "@/lib/format";
 import {
   lookupCepClient,
@@ -205,8 +206,13 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     setSubmitting(true);
     const orderId = `TT-${Date.now().toString().slice(-6)}`;
 
+    // O código do pedido é criado aqui (e não pelo banco) pra o aparelho poder guardá-lo e mostrar
+    // o pedido em "Meus pedidos" — a leitura direta da tabela de pedidos foi fechada.
+    const orderUuid =
+      typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : undefined;
     try {
-      await supabase.from("orders" as never).insert({
+      const { error: insertError } = (await supabase.from("orders" as never).insert({
+        ...(orderUuid ? { id: orderUuid } : {}),
         order_number: orderId,
         customer_id: customer?.id ?? null,
         customer_name: name,
@@ -232,7 +238,9 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
         notes: notes || null,
         status: "novo",
         ...getStoredUtm(),
-      } as never);
+      } as never)) as unknown as { error: unknown };
+      if (insertError) console.error("Erro ao salvar pedido:", insertError);
+      else if (orderUuid) rememberOrderId(orderUuid);
     } catch (e) {
       console.error("Erro ao salvar pedido:", e);
     }

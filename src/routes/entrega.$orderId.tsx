@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchOrdersByIds } from "@/lib/my-orders";
 import { brl } from "@/lib/format";
 import { CheckCircle2, Copy, Loader2, MapPin, Phone } from "lucide-react";
 import { toast } from "sonner";
@@ -45,12 +45,9 @@ function EntregaPage() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = (await supabase
-      .from("orders" as never)
-      .select("*")
-      .eq("id", orderId)
-      .maybeSingle()) as unknown as { data: OrderRow | null };
-    setOrder(data);
+    // O link do motoboy tem o código do pedido; a função do banco devolve só esse pedido.
+    const list = await fetchOrdersByIds<OrderRow>([orderId]);
+    setOrder(list[0] ?? null);
     setLoading(false);
   };
 

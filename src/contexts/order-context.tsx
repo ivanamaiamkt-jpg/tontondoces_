@@ -131,16 +131,14 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     // Upsert no banco em background — pega/atribui id
     try {
       const cleanPhone = c.phone.replace(/\D/g, "");
-      const { data, error } = await (supabase
-        .from("customers" as never)
-        .upsert(
-          { name: c.name, phone: cleanPhone, updated_at: new Date().toISOString() } as never,
-          { onConflict: "phone" } as never,
-        )
-        .select("id")
-        .single());
+      // Função do banco: cria/reaproveita o cliente pelo telefone e devolve só o id
+      // (a tabela de clientes não é mais legível pelo site).
+      const { data, error } = (await supabase.rpc("upsert_customer" as never, {
+        p_name: c.name,
+        p_phone: cleanPhone,
+      } as never)) as unknown as { data: string | null; error: unknown };
       if (!error && data) {
-        const withId = { ...c, id: (data as { id: string }).id };
+        const withId = { ...c, id: data };
         setCustomer(withId);
         try {
           localStorage.setItem(STORAGE_CUSTOMER, JSON.stringify(withId));

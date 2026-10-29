@@ -46,19 +46,18 @@ export async function syncAbandonedCart({ nome, telefone, items, status = "ativo
   const cleanPhone = (telefone ?? "").replace(/\D/g, "");
 
   try {
-    await (supabase.from("carrinhos_abandonados" as never).upsert(
-      {
-        session_id,
-        nome: trimmed,
-        telefone: cleanPhone || null,
-        itens,
-        total,
-        status,
-        atualizado_em: new Date().toISOString(),
-        ...getStoredUtm(),
-      } as never,
-      { onConflict: "session_id" } as never,
-    ));
+    const utm = getStoredUtm();
+    await supabase.rpc("sync_abandoned_cart" as never, {
+      p_session: session_id,
+      p_nome: trimmed,
+      p_telefone: cleanPhone || null,
+      p_itens: itens,
+      p_total: total,
+      p_status: status,
+      p_utm_source: utm.utm_source,
+      p_utm_medium: utm.utm_medium,
+      p_utm_campaign: utm.utm_campaign,
+    } as never);
   } catch (e) {
     console.error("syncAbandonedCart error:", e);
   }
@@ -68,10 +67,7 @@ export async function markCartConverted() {
   const session_id = typeof window !== "undefined" ? localStorage.getItem(SESSION_KEY) : null;
   if (!session_id) return;
   try {
-    await (supabase
-      .from("carrinhos_abandonados" as never)
-      .update({ status: "convertido", atualizado_em: new Date().toISOString() } as never)
-      .eq("session_id", session_id));
+    await supabase.rpc("mark_cart_converted" as never, { p_session: session_id } as never);
   } catch (e) {
     console.error("markCartConverted error:", e);
   }
