@@ -4,7 +4,7 @@ import { useOrder } from "@/contexts/order-context";
 import { brl } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { CheckoutSheet } from "./checkout-sheet";
-import { getSuggestionProducts } from "@/lib/menu-data";
+import { useCartSuggestions } from "@/lib/cart-suggestions";
 import { useMinOrder } from "@/lib/min-order";
 import { PAIR_PROMO_LABEL } from "@/lib/pair-promo";
 import { toast } from "sonner";
@@ -39,19 +39,19 @@ export function CartDrawer() {
     }
   }, [cartOpen, items, subtotal]);
 
-  const inCartIds = new Set(items.map((i) => i.productId));
-  const suggestions = getSuggestionProducts()
-    .filter((p) => !inCartIds.has(p.id))
-    .slice(0, 3);
+  // Sugestões do dia (rodízio configurado em Admin > Configurações). "via" marca no pedido
+  // que o item veio da sugestão, pra ela medir o que vende.
+  const suggestions = useCartSuggestions(items.map((i) => i.productId));
 
   const addSuggestion = (id: string) => {
-    const p = getSuggestionProducts().find((x) => x.id === id);
+    const p = suggestions.find((x) => x.id === id);
     if (!p) return;
     addItem({
       productId: p.id,
       productName: p.name,
       unitPrice: p.price,
       flavorLabels: [],
+      via: "sugestao",
     });
     toast.success(`+ ${p.name} 💜`);
   };

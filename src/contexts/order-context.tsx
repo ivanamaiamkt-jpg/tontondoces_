@@ -25,6 +25,8 @@ export type CartItem = {
   eventLabel?: string;
   /** Se true, aviso "sujeito a confirmação" deve ser mostrado. */
   needsConfirmation?: boolean;
+  /** De onde o item veio (ex.: "sugestao" = botão do carrinho). Fica gravado no pedido. */
+  via?: string;
 };
 
 export type Customer = {

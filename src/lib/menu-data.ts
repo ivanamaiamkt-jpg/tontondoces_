@@ -502,13 +502,3 @@ export const CATEGORIES: Category[] = [
 export const STORE_ADDRESS = "Rua Pedro Lombardi, 890 - Vila Mineirão, Sorocaba - SP, 18076-520";
 
 export const OWNER_WHATSAPP = "5515998564202";
-
-export function getSuggestionProducts(): Product[] {
-  const out: Product[] = [];
-  for (const cat of CATEGORIES) {
-    for (const p of cat.products) {
-      if (p.suggestion) out.push(p);
-    }
-  }
-  return out;
-}
