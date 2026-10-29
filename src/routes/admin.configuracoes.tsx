@@ -7,7 +7,7 @@ import { CATEGORIES } from "@/lib/menu-data";
 import { brl } from "@/lib/format";
 import {
   DEFAULT_SUGGESTION_POOL,
-  isOneTapProduct,
+  isSuggestible,
   pickSuggestions,
   type SuggestionMode,
 } from "@/lib/cart-suggestions";
@@ -32,12 +32,19 @@ const NUMERIC_ERRORS: Record<string, string> = {
   delivery_max_km: "Digite o raio em km, por exemplo 7",
   delivery_fee_per_km: "Digite a taxa por km, por exemplo 1,10",
   delivery_eta_min: "Digite os minutos, por exemplo 60",
+  gift_min: "Digite o valor em reais, por exemplo 60 (0 desliga o brinde)",
 };
 
 const FIELDS: Field[] = [
   { key: "whatsapp", label: "WhatsApp da loja", placeholder: "5511999999999", help: "Só números, com código do país (55) e DDD." },
   { key: "motoboy_whatsapp", label: "WhatsApp do motoboy", placeholder: "5515998244807", help: "Só números, com código do país (55) e DDD. É pra esse número que o painel manda o endereço da entrega." },
   { key: "min_order", label: "Pedido mínimo (R$)", placeholder: "15", help: "Valor mínimo de um pedido, em reais. Ex.: 15 ou 15,50. Vale no site pra todos os clientes assim que você salvar." },
+  {
+    key: "gift_min",
+    label: "Brinde a partir de (R$)",
+    placeholder: "60",
+    help: "Quem fizer um pedido desse valor ou mais (sem contar a entrega) ganha um brinde. O cliente vê só \"brinde\"; pra você, o pedido mostra qual é. Coloque 0 pra desligar.",
+  },
   {
     key: "delivery_enabled",
     label: "Entrega própria",
@@ -85,7 +92,7 @@ function ConfigPage() {
     if (NUMERIC_ERRORS[key]) {
       const n = Number(value.replace(",", "."));
       // Pedido mínimo pode ser 0; raio, taxa e tempo precisam ser maiores que 0.
-      const minOk = key === "min_order" ? n >= 0 : n > 0;
+      const minOk = key === "min_order" || key === "gift_min" ? n >= 0 : n > 0;
       if (!value.trim() || !Number.isFinite(n) || !minOk) {
         toast.error(NUMERIC_ERRORS[key]);
         return;
@@ -203,7 +210,7 @@ function CartSuggestionsSettings() {
       <h2 className="font-display text-xl">Sugestões no carrinho</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         Quando o cliente abre o carrinho, aparecem os produtos abaixo, com foto, num carrossel pra
-        deslizar pro lado e acrescentar com um toque. Marque os que podem ser sugeridos (só entram os que não pedem escolha de sabor). Os que já
+        deslizar pro lado e acrescentar com um toque. Marque os que podem ser sugeridos (os que têm sabor abrem a escolha do sabor). Os que já
         estão no carrinho, esgotados ou arquivados não aparecem.
       </p>
 
@@ -219,7 +226,7 @@ function CartSuggestionsSettings() {
 
       <div className="mt-4 space-y-4">
         {CATEGORIES.map((cat) => {
-          const items = cat.products.filter(isOneTapProduct);
+          const items = cat.products.filter(isSuggestible);
           if (items.length === 0) return null;
           return (
             <div key={cat.id}>

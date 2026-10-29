@@ -16,6 +16,7 @@ import { OWNER_WHATSAPP, STORE_ADDRESS } from "@/lib/menu-data";
 import { useMinOrder } from "@/lib/min-order";
 import { PAIR_PROMO_LABEL } from "@/lib/pair-promo";
 import { PAYMENTS_BY_RECEIVING, type PaymentMethod } from "@/lib/payment";
+import { giftOrderItem, GIFT_LABEL, useGiftMin } from "@/lib/gift";
 import { brl, maskPhone, maskCep } from "@/lib/format";
 import {
   lookupCepClient,
@@ -72,6 +73,7 @@ const RECEIVING_SUMMARY: Record<Receiving, string> = {
 export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { items, subtotal, discount, clearCart, setCartOpen, customer } = useOrder();
   const MIN_ORDER = useMinOrder();
+  const giftMin = useGiftMin();
   const delivery = useDeliverySettings();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -169,6 +171,8 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     quoteState.kind === "done" && quoteState.quote.status === "ok" ? quoteState.quote : null;
   const deliveryFee = receiving === "delivery" && approvedQuote ? approvedQuote.fee : 0;
   const total = subtotal - discount + deliveryFee;
+  // Brinde: vale pelo valor dos produtos (com desconto, sem contar a entrega).
+  const hasGift = giftMin > 0 && subtotal - discount >= giftMin;
   const step2Valid =
     receiving === "pickup" ||
     receiving === "uber" ||
@@ -219,7 +223,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
               delivery_km: approvedQuote.km,
             }
           : {}),
-        items: items as unknown as object,
+        items: (hasGift ? [...items, giftOrderItem()] : items) as unknown as object,
         subtotal,
         ...(discount > 0 ? { discount } : {}),
         delivery_fee: deliveryFee,
@@ -246,6 +250,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
       if (it.eventLabel) lines.push(`   📅 Festa: ${it.eventLabel}`);
       if (it.needsConfirmation) lines.push(`   ⚠️ Menos de 24h — sujeito a confirmação`);
     });
+    if (hasGift) lines.push(`🎁 ${GIFT_LABEL} (grátis)`);
     lines.push("");
     if (discount > 0) {
       lines.push(`*Subtotal:* ${brl(subtotal)}`);
@@ -784,6 +789,12 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                           <span className="shrink-0 font-medium">{brl(it.unitPrice * it.quantity)}</span>
                         </li>
                       ))}
+                      {hasGift && (
+                        <li className="flex justify-between gap-3 text-green-700">
+                          <span>🎁 {GIFT_LABEL}</span>
+                          <span className="shrink-0 font-medium">grátis</span>
+                        </li>
+                      )}
                     </ul>
                   </div>
 

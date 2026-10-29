@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
 import { OWNER_WHATSAPP } from "@/lib/menu-data";
 import { paymentLabel } from "@/lib/payment";
+import { GIFT_INTERNAL_LABEL, GIFT_PRODUCT_ID } from "@/lib/gift";
 import { MessageCircle, Phone, Trash2, X, Check, Ban } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,6 +35,7 @@ const PIX_KEY = "diretorios.tonton@gmail.com";
 const STORE_ADDRESS_SHORT = "Rua Pedro Lombardi, 890 — Vila Mineirão";
 
 type OrderItem = {
+  productId?: string;
   productName: string;
   quantity: number;
   unitPrice: number;
@@ -220,6 +222,11 @@ function OrderCardBody({ order: o, colId, h }: { order: Order; colId: string; h:
         {receivingLabel(o)} · {o.payment_method === "link" ? "Link" : paymentLabel(o.payment_method)}
       </p>
       <p className="mt-1 font-display text-lg text-primary">{brl(Number(o.total))}</p>
+      {(o.items ?? []).some((it) => it.productId === GIFT_PRODUCT_ID) && (
+        <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-800">
+          🎁 {GIFT_INTERNAL_LABEL}
+        </p>
+      )}
 
       <div className="mt-2 flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
         {colId !== "aguardando_entrega" && (
@@ -648,7 +655,8 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
             <ul className="mt-1 space-y-1 text-foreground">
               {(order.items ?? []).map((it, i) => (
                 <li key={i}>
-                  <strong>{it.quantity}×</strong> {it.productName}
+                  <strong>{it.quantity}×</strong>{" "}
+                  {it.productId === GIFT_PRODUCT_ID ? `🎁 ${GIFT_INTERNAL_LABEL}` : it.productName}
                   {it.flavorLabels?.length ? ` — ${it.flavorLabels.join(", ")}` : ""}
                   {it.eventLabel ? ` (evento: ${it.eventLabel})` : ""} ·{" "}
                   <span className="text-muted-foreground">

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Minus, Plus, Trash2, X, ShoppingBag, ArrowLeft, Sparkles } from "lucide-react";
+import { Minus, Plus, Trash2, X, ShoppingBag, ArrowLeft, Sparkles, Gift } from "lucide-react";
 import { useOrder } from "@/contexts/order-context";
 import { brl } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { CheckoutSheet } from "./checkout-sheet";
+import { SuggestionCarousel, SuggestionFlavorSheet } from "./suggestion-carousel";
+import { useGiftMin } from "@/lib/gift";
 import { useCartSuggestions } from "@/lib/cart-suggestions";
 import { useMinOrder } from "@/lib/min-order";
 import { PAIR_PROMO_LABEL } from "@/lib/pair-promo";
@@ -43,14 +45,24 @@ export function CartDrawer() {
   // que o item veio da sugestão, pra ela medir o que vende.
   const suggestions = useCartSuggestions(items.map((i) => i.productId));
 
-  const addSuggestion = (id: string) => {
+  // Produto com sabor: a barra de escolha do sabor abre embaixo do carrossel.
+  const [pickingId, setPickingId] = useState<string | null>(null);
+  const picking = suggestions.find((x) => x.id === pickingId) ?? null;
+  const giftMin = useGiftMin();
+
+  const addSuggestion = (id: string, flavor?: { name: string; price?: number }) => {
     const p = suggestions.find((x) => x.id === id);
     if (!p) return;
+    if (p.flavors && !flavor) {
+      setPickingId(id);
+      return;
+    }
+    setPickingId(null);
     addItem({
       productId: p.id,
       productName: p.name,
-      unitPrice: p.price,
-      flavorLabels: [],
+      unitPrice: flavor?.price ?? p.price,
+      flavorLabels: flavor ? [flavor.name] : [],
       via: "sugestao",
     });
     toast.success(`+ ${p.name} 💜`);
@@ -182,61 +194,43 @@ export function CartDrawer() {
                   <p className="mt-0.5 px-4 text-[11px] text-muted-foreground">
                     Deslize pro lado pra ver mais
                   </p>
-                  {/* carrossel: cartões compactos com foto pequena, nome, descrição, preço e botão de adicionar */}
-                  <ul className="mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {suggestions.map((s) => {
-                      const promo = s.originalPrice && s.originalPrice > s.price;
-                      return (
-                        <li
-                          key={s.id}
-                          className="flex w-[17rem] shrink-0 snap-start gap-2.5 rounded-xl border border-border bg-card p-2.5"
-                        >
-                          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
-                            {s.image && (
-                              <img
-                                src={s.image}
-                                alt={s.name}
-                                loading="lazy"
-                                decoding="async"
-                                className="h-full w-full object-cover"
-                              />
-                            )}
-                          </div>
-                          <div className="flex min-w-0 flex-1 flex-col">
-                            {(promo || s.badge) && (
-                              <span className="mb-0.5 w-fit rounded-full bg-gold/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-primary">
-                                {s.badge ?? "Promoção"}
-                              </span>
-                            )}
-                            <p className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">
-                              {s.name}
-                            </p>
-                            <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
-                              {s.description}
-                            </p>
-                            <div className="mt-auto flex items-end justify-between gap-2 pt-1.5">
-                              <div className="leading-none">
-                                {promo && (
-                                  <p className="text-[10px] text-muted-foreground line-through">
-                                    {brl(s.originalPrice!)}
-                                  </p>
-                                )}
-                                <p className="text-sm font-bold text-primary">{brl(s.price)}</p>
-                              </div>
-                              <Button
-                                size="sm"
-                                onClick={() => addSuggestion(s.id)}
-                                aria-label={`Adicionar ${s.name}`}
-                                className="h-8 w-8 shrink-0 rounded-full bg-primary p-0 text-primary-foreground hover:bg-primary-glow"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <SuggestionCarousel suggestions={suggestions} onAdd={(id) => addSuggestion(id)} />
+                  {picking && (
+                    <SuggestionFlavorSheet
+                      product={picking}
+                      onPick={(f) => addSuggestion(picking.id, f)}
+                      onClose={() => setPickingId(null)}
+                    />
+                  )}
+                </div>
+              )}
+
+              {giftMin > 0 && (
+                <div
+                  className={`mt-4 rounded-2xl border p-3.5 ${
+                    total >= giftMin
+                      ? "border-green-300 bg-green-50"
+                      : "border-primary/20 bg-primary/5"
+                  }`}
+                >
+                  <p
+                    className={`flex items-center gap-2 text-sm font-semibold ${
+                      total >= giftMin ? "text-green-800" : "text-primary"
+                    }`}
+                  >
+                    <Gift className="h-4 w-4 shrink-0" />
+                    {total >= giftMin
+                      ? "Você ganhou um brinde! 🎁"
+                      : `Faltam ${brl(giftMin - total)} pra você ganhar um brinde 🎁`}
+                  </p>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        total >= giftMin ? "bg-green-600" : "bg-primary"
+                      }`}
+                      style={{ width: `${Math.min(100, Math.round((total / giftMin) * 100))}%` }}
+                    />
+                  </div>
                 </div>
               )}
 

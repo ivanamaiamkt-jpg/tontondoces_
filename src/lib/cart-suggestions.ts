@@ -7,25 +7,29 @@ import { getAvailabilityState } from "@/lib/product-availability";
 
 export type SuggestionMode = "rodizio" | "fixo";
 
-/** Produtos mais baratos que entram direto no carrinho (sem escolher sabor). */
+/** Sugestões padrão: as opções mais baratas (as que têm sabor abrem a escolha do sabor). */
 export const DEFAULT_SUGGESTION_POOL = [
   "gourmet-brig-oreo",
   "gourmet-brig-ninho-oreo",
+  "geladinho-gourmet",
+  "promo-copo-150",
+  "art-brownie",
+  "art-camafeu",
   "morango-cravejado-tradicional",
   "gourmet-espetinho-uva-ninho",
-  "espetinho-morango-cravejado",
 ];
 
 // O carrinho mostra as sugestões num carrossel (deslizar pro lado), então cabem várias.
 const SHOWN = 8;
 
-/** Só produtos de um toque: sem sabor/opção a escolher e sem agendamento. */
-export function isOneTapProduct(p: Product): boolean {
-  return !p.flavors && !p.flavorPicks && !p.requiresScheduling && !p.minQuantity;
+/** Pode ser sugerido: entra direto ou depois de escolher UM sabor. Ficam de fora os combos de
+ * vários sabores e o que pede agendamento/quantidade mínima. */
+export function isSuggestible(p: Product): boolean {
+  return !p.flavorPicks && !p.requiresScheduling && !p.minQuantity;
 }
 
-export function allOneTapProducts(): Product[] {
-  return CATEGORIES.flatMap((c) => c.products).filter(isOneTapProduct);
+export function allSuggestibleProducts(): Product[] {
+  return CATEGORIES.flatMap((c) => c.products).filter(isSuggestible);
 }
 
 /** Dia local como número, pra o rodízio mudar à meia-noite do horário de Brasília. */
@@ -41,7 +45,7 @@ export function pickSuggestions(opts: {
   unavailable: Set<string>;
   now?: Date;
 }): Product[] {
-  const byId = new Map(allOneTapProducts().map((p) => [p.id, p]));
+  const byId = new Map(allSuggestibleProducts().map((p) => [p.id, p]));
   const valid = opts.pool.map((id) => byId.get(id)).filter((p): p is Product => !!p);
   const free = (p: Product) => !opts.cartProductIds.includes(p.id) && !opts.unavailable.has(p.id);
   // O rodízio gira sobre a lista toda (e não só sobre o que sobrou), assim as sugestões não
