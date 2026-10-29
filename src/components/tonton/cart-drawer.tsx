@@ -174,38 +174,68 @@ export function CartDrawer() {
               </ul>
 
               {suggestions.length > 0 && (
-                <div className="mt-6 rounded-2xl border border-gold/40 bg-gold/5 p-4">
-                  <p className="flex items-center gap-1.5 font-display text-sm font-semibold text-chocolate">
+                <div className="mt-6 rounded-2xl border border-gold/40 bg-gold/5 py-4">
+                  <p className="flex items-center gap-1.5 px-4 font-display text-sm font-semibold text-chocolate">
                     <Sparkles className="h-4 w-4 text-gold" />
                     Que tal acrescentar?
                   </p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    Sugestões pequenas pra deixar o pedido ainda mais doce
+                  <p className="mt-0.5 px-4 text-[11px] text-muted-foreground">
+                    Deslize pro lado pra ver mais
                   </p>
-                  <ul className="mt-3 space-y-2">
-                    {suggestions.map((s) => (
-                      <li
-                        key={s.id}
-                        className="flex items-center justify-between gap-3 rounded-xl bg-card p-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-foreground">
-                            {s.name}
-                          </p>
-                          <p className="text-xs font-bold text-primary">
-                            + {brl(s.price)}
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => addSuggestion(s.id)}
-                          className="shrink-0 rounded-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                  {/* carrossel: cartões compactos com foto pequena, nome, descrição, preço e botão de adicionar */}
+                  <ul className="mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {suggestions.map((s) => {
+                      const promo = s.originalPrice && s.originalPrice > s.price;
+                      return (
+                        <li
+                          key={s.id}
+                          className="flex w-[17rem] shrink-0 snap-start gap-2.5 rounded-xl border border-border bg-card p-2.5"
                         >
-                          <Plus className="h-3.5 w-3.5" />
-                        </Button>
-                      </li>
-                    ))}
+                          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
+                            {s.image && (
+                              <img
+                                src={s.image}
+                                alt={s.name}
+                                loading="lazy"
+                                decoding="async"
+                                className="h-full w-full object-cover"
+                              />
+                            )}
+                          </div>
+                          <div className="flex min-w-0 flex-1 flex-col">
+                            {(promo || s.badge) && (
+                              <span className="mb-0.5 w-fit rounded-full bg-gold/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-primary">
+                                {s.badge ?? "Promoção"}
+                              </span>
+                            )}
+                            <p className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">
+                              {s.name}
+                            </p>
+                            <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                              {s.description}
+                            </p>
+                            <div className="mt-auto flex items-end justify-between gap-2 pt-1.5">
+                              <div className="leading-none">
+                                {promo && (
+                                  <p className="text-[10px] text-muted-foreground line-through">
+                                    {brl(s.originalPrice!)}
+                                  </p>
+                                )}
+                                <p className="text-sm font-bold text-primary">{brl(s.price)}</p>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => addSuggestion(s.id)}
+                                aria-label={`Adicionar ${s.name}`}
+                                className="h-8 w-8 shrink-0 rounded-full bg-primary p-0 text-primary-foreground hover:bg-primary-glow"
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}

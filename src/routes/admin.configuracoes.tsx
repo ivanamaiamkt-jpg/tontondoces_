@@ -202,8 +202,8 @@ function CartSuggestionsSettings() {
     <section className="mt-6 rounded-2xl border border-border bg-card p-5">
       <h2 className="font-display text-xl">Sugestões no carrinho</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Quando o cliente abre o carrinho, aparecem 3 produtos pra ele acrescentar com um toque.
-        Marque os que podem ser sugeridos (só entram os que não pedem escolha de sabor). Os que já
+        Quando o cliente abre o carrinho, aparecem os produtos abaixo, com foto, num carrossel pra
+        deslizar pro lado e acrescentar com um toque. Marque os que podem ser sugeridos (só entram os que não pedem escolha de sabor). Os que já
         estão no carrinho, esgotados ou arquivados não aparecem.
       </p>
 
@@ -213,8 +213,8 @@ function CartSuggestionsSettings() {
         onChange={(e) => setMode(e.target.value as SuggestionMode)}
         className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
       >
-        <option value="rodizio">Rodízio: muda todo dia entre os marcados</option>
-        <option value="fixo">Fixo: sempre os 3 primeiros marcados</option>
+        <option value="rodizio">Rodízio: a ordem muda todo dia</option>
+        <option value="fixo">Fixo: sempre na mesma ordem</option>
       </select>
 
       <div className="mt-4 space-y-4">
@@ -249,7 +249,7 @@ function CartSuggestionsSettings() {
 
       <p className="mt-4 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
         {today.length > 0
-          ? `Hoje o carrinho mostra: ${today.map((p) => p.name).join(" · ")}`
+          ? `Hoje o carrinho mostra, nesta ordem: ${today.map((p) => p.name).join(" · ")}`
           : "Marque pelo menos um produto pra aparecer a sugestão no carrinho."}
       </p>
 

@@ -1,5 +1,5 @@
-// "Que tal acrescentar?" no carrinho: 3 sugestões de produtos que entram com um toque, em rodízio
-// por dia (pra ela testar o que vende mais). A lista e o modo vêm de Admin > Configurações.
+// "Que tal acrescentar?" no carrinho: sugestões de produtos que entram com um toque, em rodízio
+// por dia (a ordem muda todo dia pra ela testar o que vende mais). A lista e o modo vêm de Admin > Configurações.
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, type Product } from "@/lib/menu-data";
@@ -16,7 +16,8 @@ export const DEFAULT_SUGGESTION_POOL = [
   "espetinho-morango-cravejado",
 ];
 
-const SHOWN = 3;
+// O carrinho mostra as sugestões num carrossel (deslizar pro lado), então cabem várias.
+const SHOWN = 8;
 
 /** Só produtos de um toque: sem sabor/opção a escolher e sem agendamento. */
 export function isOneTapProduct(p: Product): boolean {
