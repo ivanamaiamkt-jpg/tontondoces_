@@ -15,6 +15,7 @@ import { useOrder } from "@/contexts/order-context";
 import { OWNER_WHATSAPP, STORE_ADDRESS } from "@/lib/menu-data";
 import { useMinOrder } from "@/lib/min-order";
 import { PAIR_PROMO_LABEL } from "@/lib/pair-promo";
+import { PAYMENTS_BY_RECEIVING, type PaymentMethod } from "@/lib/payment";
 import { brl, maskPhone, maskCep } from "@/lib/format";
 import {
   lookupCepClient,
@@ -77,7 +78,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
   const [name, setName] = useState(customer?.name ?? "");
   const [phone, setPhone] = useState(customer?.phone ? maskPhone(customer.phone) : "");
   const [receiving, setReceiving] = useState<Receiving | null>(null);
-  const [payment, setPayment] = useState<"pix" | "maquininha">("pix");
+  const [payment, setPayment] = useState<PaymentMethod>("pix");
   const [notes, setNotes] = useState("");
   const [cep, setCep] = useState("");
   const [cepState, setCepState] = useState<CepState>({ kind: "idle" });
@@ -90,7 +91,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState<{
     orderId: string;
-    payment: "pix" | "maquininha";
+    payment: PaymentMethod;
     total: number;
     name: string;
     summary: string;
@@ -172,12 +173,13 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     receiving === "pickup" ||
     receiving === "uber" ||
     (receiving === "delivery" && approvedQuote !== null);
-  // Com Uber o pagamento é sempre PIX adiantado (o motorista não leva maquininha).
-  const effectivePayment: "pix" | "maquininha" = receiving === "uber" ? "pix" : payment;
+  // Forma de pagamento valida pro recebimento escolhido (Uber nao leva maquininha; link so na
+  // entrega e no Uber). Se a escolha anterior nao vale mais, volta pro PIX.
+  const allowedPayments = receiving ? PAYMENTS_BY_RECEIVING[receiving] : PAYMENTS_BY_RECEIVING.pickup;
+  const effectivePayment: PaymentMethod = allowedPayments.includes(payment) ? payment : "pix";
 
   const chooseReceiving = (r: Receiving) => {
     setReceiving(r);
-    if (r === "uber") setPayment("pix");
   };
 
   const addressLine =
@@ -260,7 +262,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     lines.push(`*Total:* ${brl(total)}`);
     lines.push("");
     lines.push(
-      `*Pagamento:* ${effectivePayment === "pix" ? "PIX (chave enviada após confirmação)" : receiving === "delivery" ? "Cartão (débito ou crédito na entrega)" : "Cartão (débito ou crédito na retirada)"}`,
+      `*Pagamento:* ${effectivePayment === "pix" ? "PIX (chave enviada após confirmação)" : effectivePayment === "link" ? "Link de pagamento (a TonTon envia o link pelo WhatsApp)" : receiving === "delivery" ? "Cartão (débito ou crédito na entrega)" : "Cartão (débito ou crédito na retirada)"}`,
     );
     if (notes) lines.push(`*Observações:* ${notes}`);
     if (isPaused()) {
@@ -311,7 +313,9 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     const header =
       confirmed.payment === "pix"
         ? `Oi TonTon! 💜 Sou ${confirmed.name}. Segue meu pedido (vou enviar o comprovante do PIX em seguida):\n\n`
-        : `Oi TonTon! 💜 Sou ${confirmed.name}. Segue meu pedido:\n\n`;
+        : confirmed.payment === "link"
+          ? `Oi TonTon! 💜 Sou ${confirmed.name}. Segue meu pedido — quero pagar pelo link de pagamento:\n\n`
+          : `Oi TonTon! 💜 Sou ${confirmed.name}. Segue meu pedido:\n\n`;
     const msg = encodeURIComponent(header + confirmed.summary);
     window.open(`https://wa.me/${OWNER_WHATSAPP}?text=${msg}`, "_blank");
     try {
@@ -407,9 +411,11 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
               <strong>
                 {confirmed.payment === "pix"
                   ? "PIX"
-                  : confirmed.receiving === "delivery"
-                    ? "Cartão na entrega"
-                    : "Cartão na retirada"}
+                  : confirmed.payment === "link"
+                    ? "Link de pagamento"
+                    : confirmed.receiving === "delivery"
+                      ? "Cartão na entrega"
+                      : "Cartão na retirada"}
               </strong>
             </p>
 
@@ -431,6 +437,18 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                 </div>
                 <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
                   Após pagar, envie o comprovante junto com o pedido pelo WhatsApp 💕
+                </p>
+              </div>
+            )}
+
+            {confirmed.payment === "link" && (
+              <div className="mt-5 rounded-2xl border-2 border-primary/30 bg-primary/5 p-4 text-left">
+                <p className="font-display text-sm font-semibold text-primary">
+                  🔗 Link de pagamento
+                </p>
+                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                  Envie o pedido pelo WhatsApp que a gente cria o link e manda pra você pagar online
+                  💕
                 </p>
               </div>
             )}
@@ -786,7 +804,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                           Chave enviada após confirmação do pedido
                         </div>
                       </button>
-                      {(receiving === "pickup" || receiving === "delivery") && (
+                      {allowedPayments.includes("maquininha") && (
                         <button
                           type="button"
                           onClick={() => setPayment("maquininha")}
@@ -804,10 +822,26 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                           </div>
                         </button>
                       )}
+                      {allowedPayments.includes("link") && (
+                        <button
+                          type="button"
+                          onClick={() => setPayment("link")}
+                          className={`rounded-xl border-2 p-3 text-left text-sm transition ${
+                            effectivePayment === "link"
+                              ? "border-primary bg-primary/5"
+                              : "border-border bg-card"
+                          }`}
+                        >
+                          <div className="font-semibold text-foreground">🔗 Link de pagamento</div>
+                          <div className="text-xs text-muted-foreground">
+                            A gente manda o link pelo WhatsApp pra você pagar online
+                          </div>
+                        </button>
+                      )}
                     </div>
                     {receiving === "uber" && (
                       <p className="mt-2 text-xs text-muted-foreground">
-                        Com Uber o pagamento é só por PIX, adiantado.
+                        Com Uber o pagamento é adiantado: PIX ou link de pagamento.
                       </p>
                     )}
                   </div>

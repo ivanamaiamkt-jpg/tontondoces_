@@ -1,3 +1,4 @@
+import { paymentLabel } from "@/lib/payment";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -312,7 +313,7 @@ function MeusPedidosPage() {
                           ? "Uber"
                           : "Retirada"}{" "}
                       ·{" "}
-                      {o.payment_method === "pix" ? "PIX" : "Maquininha"}
+                      {paymentLabel(o.payment_method)}
                     </span>
                     <span className="font-display text-base font-semibold text-primary">
                       {brl(Number(o.total))}

@@ -134,7 +134,7 @@ function EntregaPage() {
 
           <section className="flex items-center justify-between rounded-xl bg-muted/40 px-3 py-2.5">
             <span className="text-muted-foreground">
-              {order.payment_method === "pix" ? "PIX (já pago)" : "Maquininha na entrega"}
+              {order.payment_method === "pix" ? "PIX (já pago)" : order.payment_method === "link" ? "Link de pagamento (pago online)" : "Maquininha na entrega"}
             </span>
             <span className="font-display text-lg text-primary">{brl(Number(order.total))}</span>
           </section>

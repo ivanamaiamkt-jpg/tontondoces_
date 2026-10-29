@@ -15,6 +15,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
 import { OWNER_WHATSAPP } from "@/lib/menu-data";
+import { paymentLabel } from "@/lib/payment";
 import { MessageCircle, Phone, Trash2, X, Check, Ban } from "lucide-react";
 import { toast } from "sonner";
 
@@ -150,9 +151,11 @@ function buildReadyMsg(o: Order) {
   const pay =
     o.payment_method === "pix"
       ? `\n\nChave PIX: ${PIX_KEY}\nValor: ${brl(Number(o.total))}`
-      : isDelivery
-        ? `\n\nPagamento na entrega na maquininha 💳`
-        : `\n\nPagamento na retirada na maquininha 💳`;
+      : o.payment_method === "link"
+        ? ""
+        : isDelivery
+          ? `\n\nPagamento na entrega na maquininha 💳`
+          : `\n\nPagamento na retirada na maquininha 💳`;
   const ready =
     o.delivery_mode === "uber"
       ? `Oi ${first}! 🍫 Seu pedido #${o.order_number} está prontinho! Pode chamar o Uber agora e colar este endereço: ${STORE_ADDRESS_SHORT}, Sorocaba. 💕`
@@ -168,7 +171,11 @@ function buildMotoboyMsg(o: Order) {
       ? `${o.street ?? ""}, ${o.number ?? ""}${o.complement ? ` — ${o.complement}` : ""} — ${o.neighborhood ?? ""} — ${o.city ?? ""}`
       : "Retirada no local";
   const pagamentoLine =
-    o.payment_method === "pix" ? "PIX (já pago)" : "Maquininha (cobrar na entrega)";
+    o.payment_method === "pix"
+      ? "PIX (já pago)"
+      : o.payment_method === "link"
+        ? "Link de pagamento (pago online)"
+        : "Maquininha (cobrar na entrega)";
   const link =
     typeof window !== "undefined" ? `${window.location.origin}/entrega/${o.id}` : "";
   return `🛵 Nova entrega — TonTon Doces\n${o.customer_name} — ${brl(Number(o.total))} (${pagamentoLine})\n\n📍 ${enderecoLine}\n\nVer pedido completo:\n${link}`;
@@ -210,7 +217,7 @@ function OrderCardBody({ order: o, colId, h }: { order: Order; colId: string; h:
         <span className="text-xs text-muted-foreground">· {formatTime(o.created_at)}</span>
       </p>
       <p className="mt-1 truncate text-xs text-muted-foreground">
-        {receivingLabel(o)} · {o.payment_method === "pix" ? "PIX" : "Maquininha"}
+        {receivingLabel(o)} · {o.payment_method === "link" ? "Link" : paymentLabel(o.payment_method)}
       </p>
       <p className="mt-1 font-display text-lg text-primary">{brl(Number(o.total))}</p>
 
@@ -694,8 +701,8 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
           <section>
             <p className="text-xs font-semibold uppercase text-muted-foreground">Pagamento</p>
             <p className="text-foreground">
-              {order.payment_method === "pix"
-                ? "PIX"
+              {order.payment_method === "pix" || order.payment_method === "link"
+                ? paymentLabel(order.payment_method)
                 : order.delivery_mode === "delivery"
                   ? "Cartão (na entrega)"
                   : "Cartão (na retirada)"}
