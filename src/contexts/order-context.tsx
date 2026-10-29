@@ -9,6 +9,7 @@ import {
 } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { syncAbandonedCart } from "@/lib/abandoned-cart";
+import { computePairDiscount } from "@/lib/pair-promo";
 
 export type CartItem = {
   /** Unique line id (random) so the same product+flavor combos can repeat. */
@@ -41,6 +42,8 @@ type OrderContextValue = {
   removeItem: (lineId: string) => void;
   clearCart: () => void;
   subtotal: number;
+  /** Desconto da promoção "2 por R$ 40,00" (0 se não houver par de copos grandes). */
+  discount: number;
   total: number;
   cartOpen: boolean;
   setCartOpen: (open: boolean) => void;
@@ -183,7 +186,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     [items],
   );
 
-  const total = subtotal;
+  const discount = useMemo(() => computePairDiscount(items), [items]);
+
+  const total = subtotal - discount;
 
   return (
     <OrderContext.Provider
@@ -194,6 +199,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         removeItem,
         clearCart,
         subtotal,
+        discount,
         total,
         cartOpen,
         setCartOpen,

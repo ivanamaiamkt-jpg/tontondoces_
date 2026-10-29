@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CheckoutSheet } from "./checkout-sheet";
 import { getSuggestionProducts } from "@/lib/menu-data";
 import { useMinOrder } from "@/lib/min-order";
+import { PAIR_PROMO_LABEL } from "@/lib/pair-promo";
 import { toast } from "sonner";
 import { trackPixel } from "@/lib/fbq";
 
@@ -18,6 +19,7 @@ export function CartDrawer() {
     updateQty,
     removeItem,
     subtotal,
+    discount,
     total,
   } = useOrder();
   const MIN_ORDER = useMinOrder();
@@ -214,6 +216,12 @@ export function CartDrawer() {
                     <dt className="text-muted-foreground">Subtotal</dt>
                     <dd>{brl(subtotal)}</dd>
                   </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-green-700">
+                      <dt>Desconto {PAIR_PROMO_LABEL}</dt>
+                      <dd>− {brl(discount)}</dd>
+                    </div>
+                  )}
                 </dl>
               </div>
 

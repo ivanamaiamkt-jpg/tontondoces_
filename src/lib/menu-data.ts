@@ -37,6 +37,7 @@ import imgGeladinhoCoco from "@/assets/produtos/geladinho-coco.webp";
 import imgGeladinhoMaracuja from "@/assets/produtos/geladinho-maracuja.webp";
 import imgGeladinhoNinho from "@/assets/produtos/geladinho-ninho.webp";
 import imgGeladinhoPudim from "@/assets/produtos/geladinho-pudim.webp";
+import { PAIR_PROMO_LABEL, PAIR_PROMO_UNIT_PRICE } from "@/lib/pair-promo";
 
 export type Flavor = {
   id: string;
@@ -253,10 +254,10 @@ export const CATEGORIES: Category[] = [
         badge: "Promoção",
         flavors: [PROMO_DUPLA_TENTACAO, PROMO_COPO_OREO, PROMO_INSPIRACAO_FERREIRO],
       }),
-      p("inspiracao-ferreiro-250", "Inspiração Ferreiro 250 ml", 19.9, imgInspiracaoFerreiro, {
+      p("inspiracao-ferreiro-250", "Inspiração Ferreiro 250 ml", PAIR_PROMO_UNIT_PRICE, imgInspiracaoFerreiro, {
         description: PROMO_INSPIRACAO_FERREIRO.description,
         originalPrice: 28.9,
-        badge: "Promoção",
+        badge: `Promoção · ${PAIR_PROMO_LABEL}`,
       }),
       p("geladinho-gourmet", "Geladinho Gourmet", 8, imgGeladinhoMaracuja, {
         description: "Cremoso e geladinho. Escolha o seu sabor.",
@@ -351,58 +352,58 @@ export const CATEGORIES: Category[] = [
     description: "",
     badge: "⭐ Mais Vendido",
     products: [
-      p("copo-doce-encanto", "Doce Encanto — Brigadeiro, Ninho, Uva", 19.9, imgDoceEncanto, {
+      p("copo-doce-encanto", "Doce Encanto — Brigadeiro, Ninho, Uva", PAIR_PROMO_UNIT_PRICE, imgDoceEncanto, {
         description:
           "280g de pura felicidade: brownie na base, brigadeiro cremoso, mousse de Ninho e uvas que estouram na boca.",
         originalPrice: 28.9,
-        badge: "⭐ Mais Vendido · Promoção",
+        badge: `⭐ Mais Vendido · ${PAIR_PROMO_LABEL}`,
       }),
-      p("copo-nevadinho", "Nevadinho — Mousse de Ninho", 19.9, imgNevadinho, {
+      p("copo-nevadinho", "Nevadinho — Mousse de Ninho", PAIR_PROMO_UNIT_PRICE, imgNevadinho, {
         description:
           "280g com brownie na base e mousse de Ninho aveludada.",
         originalPrice: 28.9,
-        badge: "Promoção",
+        badge: `Promoção · ${PAIR_PROMO_LABEL}`,
       }),
       p(
         "copo-pecado-em-dobro",
         "Pecado em Dobro | Brigadeiro & Mousse de Ninho",
-        19.9,
+        PAIR_PROMO_UNIT_PRICE,
         imgNevadinho2,
         {
           description:
             "280g com brownie na base, brigadeiro e mousse de Ninho em camadas que se fundem na colher. Pecado assumido, sem arrependimento.",
           originalPrice: 28.9,
-          badge: "Promoção",
+          badge: `Promoção · ${PAIR_PROMO_LABEL}`,
         },
       ),
       p(
         "copo-prazer-em-camadas",
         "Prazer em Camadas — Brigadeiro Tradicional",
-        19.9,
+        PAIR_PROMO_UNIT_PRICE,
         imgPrazerCamadas,
         {
           description:
             "280g com brownie na base e brigadeiro no ponto perfeito. Chocolate puro, sem enrolação.",
           originalPrice: 28.9,
-          badge: "Promoção",
+          badge: `Promoção · ${PAIR_PROMO_LABEL}`,
         },
       ),
-      p("copo-merengue", "Copo Merengue", 19.9, imgCopoMerengue, {
+      p("copo-merengue", "Copo Merengue", PAIR_PROMO_UNIT_PRICE, imgCopoMerengue, {
         description:
           "280g de creme branco sedoso, brigadeiro cremoso, morangos fresquinhos. Texturas que vão te surpreender.",
         originalPrice: 28.9,
-        badge: "Promoção",
+        badge: `Promoção · ${PAIR_PROMO_LABEL}`,
       }),
       p(
         "copo-doce-paixao",
         "Copo Doce Paixão — Brigadeiro, Ninho e Morango",
-        19.9,
+        PAIR_PROMO_UNIT_PRICE,
         imgCopoConforto,
         {
           description:
             "280g com brownie na base, brigadeiro, mousse de Ninho e morangos suculentos em camadas. O combo que virou vício.",
           originalPrice: 28.9,
-          badge: "Promoção",
+          badge: `Promoção · ${PAIR_PROMO_LABEL}`,
         },
       ),
     ],

@@ -14,6 +14,7 @@ import {
 import { useOrder } from "@/contexts/order-context";
 import { OWNER_WHATSAPP, STORE_ADDRESS } from "@/lib/menu-data";
 import { useMinOrder } from "@/lib/min-order";
+import { PAIR_PROMO_LABEL } from "@/lib/pair-promo";
 import { brl, maskPhone, maskCep } from "@/lib/format";
 import {
   lookupCepClient,
@@ -68,7 +69,7 @@ const RECEIVING_SUMMARY: Record<Receiving, string> = {
 };
 
 export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { items, subtotal, clearCart, setCartOpen, customer } = useOrder();
+  const { items, subtotal, discount, clearCart, setCartOpen, customer } = useOrder();
   const MIN_ORDER = useMinOrder();
   const delivery = useDeliverySettings();
 
@@ -166,7 +167,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
   const approvedQuote =
     quoteState.kind === "done" && quoteState.quote.status === "ok" ? quoteState.quote : null;
   const deliveryFee = receiving === "delivery" && approvedQuote ? approvedQuote.fee : 0;
-  const total = subtotal + deliveryFee;
+  const total = subtotal - discount + deliveryFee;
   const step2Valid =
     receiving === "pickup" ||
     receiving === "uber" ||
@@ -218,6 +219,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
           : {}),
         items: items as unknown as object,
         subtotal,
+        ...(discount > 0 ? { discount } : {}),
         delivery_fee: deliveryFee,
         total,
         payment_method: effectivePayment,
@@ -243,13 +245,17 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
       if (it.needsConfirmation) lines.push(`   ⚠️ Menos de 24h — sujeito a confirmação`);
     });
     lines.push("");
+    if (discount > 0) {
+      lines.push(`*Subtotal:* ${brl(subtotal)}`);
+      lines.push(`*Desconto ${PAIR_PROMO_LABEL}:* − ${brl(discount)}`);
+    }
     lines.push(`*Recebimento:* ${RECEIVING_WHATSAPP[receiving]}`);
     if (receiving === "delivery" && approvedQuote) {
       lines.push(`*Endereço:* ${addressLine}`);
       lines.push(
         `*Taxa de entrega:* ${brl(deliveryFee)} (${String(approvedQuote.km).replace(".", ",")} km${approvedQuote.precise ? "" : ", distância estimada"})`,
       );
-      lines.push(`*Subtotal:* ${brl(subtotal)}`);
+      if (discount === 0) lines.push(`*Subtotal:* ${brl(subtotal)}`);
     }
     lines.push(`*Total:* ${brl(total)}`);
     lines.push("");
@@ -824,15 +830,25 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                         <dd>{RECEIVING_SUMMARY[receiving]}</dd>
                       </div>
                       {receiving === "delivery" && approvedQuote && (
+                        <div className="flex justify-between gap-3">
+                          <dt className="text-muted-foreground">Endereço</dt>
+                          <dd className="text-right text-xs">{addressLine}</dd>
+                        </div>
+                      )}
+                      {(discount > 0 || receiving === "delivery") && (
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Subtotal</dt>
+                          <dd>{brl(subtotal)}</dd>
+                        </div>
+                      )}
+                      {discount > 0 && (
+                        <div className="flex justify-between text-green-700">
+                          <dt>Desconto {PAIR_PROMO_LABEL}</dt>
+                          <dd>− {brl(discount)}</dd>
+                        </div>
+                      )}
+                      {receiving === "delivery" && approvedQuote && (
                         <>
-                          <div className="flex justify-between gap-3">
-                            <dt className="text-muted-foreground">Endereço</dt>
-                            <dd className="text-right text-xs">{addressLine}</dd>
-                          </div>
-                          <div className="flex justify-between">
-                            <dt className="text-muted-foreground">Subtotal</dt>
-                            <dd>{brl(subtotal)}</dd>
-                          </div>
                           <div className="flex justify-between">
                             <dt className="text-muted-foreground">Taxa de entrega</dt>
                             <dd>{brl(deliveryFee)}</dd>

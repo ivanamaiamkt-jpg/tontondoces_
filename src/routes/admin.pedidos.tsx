@@ -55,6 +55,7 @@ type Order = {
   payment_method: string;
   subtotal: number;
   delivery_fee: number;
+  discount: number | null;
   delivery_km: number | null;
   cep: string | null;
   total: number;
@@ -655,6 +656,11 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
             <p>
               <span className="text-muted-foreground">Subtotal:</span> {brl(Number(order.subtotal))}
             </p>
+            {Number(order.discount) > 0 && (
+              <p className="text-green-700">
+                <span>Desconto 2 por R$ 40:</span> − {brl(Number(order.discount))}
+              </p>
+            )}
             <p>
               <span className="text-muted-foreground">Entrega:</span>{" "}
               {order.delivery_mode === "delivery"
