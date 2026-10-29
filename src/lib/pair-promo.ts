@@ -1,17 +1,15 @@
-// Promoção "2 por R$ 40,00" nos copos grandes: 1 copo custa R$ 25,00 e cada 2 copos saem por
-// R$ 40,00 (desconto de R$ 10,00 por par). Para mudar ou desligar a promoção é só mexer aqui
-// (e no preço dos copos em menu-data.ts).
+// Desconto por par de copos grandes (ex.: "2 por R$ 40,00"). DESLIGADO por enquanto, já que o copo
+// solto custa R$ 25,00 e o desconto vem só do Combo Date Doce. Está pronto para religar: basta
+// preencher a lista de copos abaixo (o carrinho, o resumo do pedido, o WhatsApp e o painel já
+// mostram o desconto quando existir).
 
-/** Copos grandes que entram na promoção (qualquer mistura de sabores conta). */
-export const PAIR_PROMO_PRODUCT_IDS = [
-  "copo-doce-encanto",
-  "copo-nevadinho",
-  "copo-pecado-em-dobro",
-  "copo-prazer-em-camadas",
-  "copo-merengue",
-  "copo-doce-paixao",
-  "inspiracao-ferreiro-250",
-];
+/**
+ * Copos grandes que entram na promoção. DESLIGADA no momento (lista vazia): o copo solto custa
+ * R$ 25,00 e o desconto vem só do Combo Date Doce (cada copo a R$ 20,00 dentro do combo).
+ * Para religar, coloque aqui os ids dos copos (ex.: "copo-doce-encanto"), ajuste os preços abaixo
+ * e ponha a etiqueta no menu-data.ts.
+ */
+export const PAIR_PROMO_PRODUCT_IDS: string[] = [];
 
 /** Preço de 1 copo e preço de cada par, em reais. */
 export const PAIR_PROMO_UNIT_PRICE = 25;
