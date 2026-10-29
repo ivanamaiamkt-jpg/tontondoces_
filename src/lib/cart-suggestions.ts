@@ -95,7 +95,7 @@ export function useCartSuggestions(cartProductIds: string[]): Product[] {
     pending ??= fetchSettings();
     pending.then((s) => alive && setSettings(s));
     getAvailabilityState()
-      .then((s) => alive && setUnavailable(new Set([...s.soldOut, ...s.archived])))
+      .then((s) => alive && s && setUnavailable(new Set([...s.soldOut, ...s.archived])))
       .catch(() => {});
     return () => {
       alive = false;

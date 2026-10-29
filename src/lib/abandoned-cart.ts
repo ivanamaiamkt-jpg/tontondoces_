@@ -3,6 +3,28 @@ import type { CartItem } from "@/contexts/order-context";
 import { getStoredUtm } from "@/lib/analytics";
 
 const SESSION_KEY = "tonton_session_id";
+const CONVERTED_KEY = "tonton_cart_converted";
+
+/** Assinatura do carrinho (linhas + quantidades) — serve pra reconhecer um carrinho que já virou pedido. */
+function cartSignature(items: CartItem[]) {
+  return items.map((i) => `${i.lineId}:${i.quantity}`).join(",");
+}
+
+function rememberConverted(items: CartItem[]) {
+  try {
+    localStorage.setItem(CONVERTED_KEY, cartSignature(items));
+  } catch {
+    // ignore
+  }
+}
+
+function isConverted(items: CartItem[]) {
+  try {
+    return localStorage.getItem(CONVERTED_KEY) === cartSignature(items);
+  } catch {
+    return false;
+  }
+}
 
 function uuid() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -15,12 +37,17 @@ function uuid() {
 
 export function getSessionId(): string {
   if (typeof window === "undefined") return "";
-  let id = localStorage.getItem(SESSION_KEY);
-  if (!id) {
-    id = uuid();
-    localStorage.setItem(SESSION_KEY, id);
+  try {
+    let id = localStorage.getItem(SESSION_KEY);
+    if (!id) {
+      id = uuid();
+      localStorage.setItem(SESSION_KEY, id);
+    }
+    return id;
+  } catch {
+    // sem armazenamento (aba anônima etc.): sem carrinho abandonado nesta visita
+    return "";
   }
-  return id;
 }
 
 type SyncArgs = {
@@ -33,6 +60,9 @@ type SyncArgs = {
 export async function syncAbandonedCart({ nome, telefone, items, status = "ativo" }: SyncArgs) {
   const trimmed = (nome ?? "").trim();
   if (trimmed.length < 2 || items.length === 0) return;
+  // Carrinho que já virou pedido não volta a "ativo" (isso fazia quem comprou aparecer como abandonado).
+  if (status === "ativo" && isConverted(items)) return;
+  if (status === "convertido") rememberConverted(items);
   const session_id = getSessionId();
   if (!session_id) return;
 
@@ -63,7 +93,8 @@ export async function syncAbandonedCart({ nome, telefone, items, status = "ativo
   }
 }
 
-export async function markCartConverted() {
+export async function markCartConverted(items?: CartItem[]) {
+  if (items) rememberConverted(items);
   const session_id = typeof window !== "undefined" ? localStorage.getItem(SESSION_KEY) : null;
   if (!session_id) return;
   try {

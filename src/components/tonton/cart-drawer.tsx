@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useDialogA11y } from "@/lib/use-dialog";
 import { Minus, Plus, Trash2, X, ShoppingBag, ArrowLeft, Sparkles, Gift } from "lucide-react";
 import { useOrder } from "@/contexts/order-context";
 import { brl } from "@/lib/format";
@@ -49,6 +50,8 @@ export function CartDrawer() {
   const [pickingId, setPickingId] = useState<string | null>(null);
   const picking = suggestions.find((x) => x.id === pickingId) ?? null;
   const giftMin = useGiftMin();
+  // Esc fecha o carrinho (com o checkout aberto por cima, o Esc é do checkout).
+  const dialogRef = useDialogA11y<HTMLElement>(cartOpen, () => setCartOpen(false));
 
   const addSuggestion = (id: string, flavor?: { name: string; price?: number }) => {
     const p = suggestions.find((x) => x.id === id);
@@ -73,19 +76,25 @@ export function CartDrawer() {
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-primary/60 backdrop-blur-sm"
+        className="fixed inset-0 z-40 bg-primary/60"
         onClick={() => setCartOpen(false)}
         aria-hidden
       />
-      <aside className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-background shadow-2xl">
+      <aside
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cart-title"
+        className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-background shadow-2xl outline-none"
+      >
         <div className="flex items-center justify-between border-b border-border bg-primary px-5 py-4 text-primary-foreground">
           <div className="flex items-center gap-2">
             <ShoppingBag className="h-5 w-5 text-gold" />
-            <h2 className="font-display text-xl">Seu carrinho</h2>
+            <h2 id="cart-title" className="font-display text-xl">Seu carrinho</h2>
           </div>
           <button
             onClick={() => setCartOpen(false)}
-            className="rounded-full p-1 hover:bg-primary-glow"
+            className="rounded-full p-2.5 hover:bg-primary-glow"
             aria-label="Fechar carrinho"
           >
             <X className="h-5 w-5" />
@@ -138,20 +147,20 @@ export function CartDrawer() {
                           </ul>
                         )}
                         {it.eventLabel && (
-                          <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold text-chocolate">
+                          <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-xs font-semibold text-chocolate">
                             📅 {it.eventLabel}
                           </p>
                         )}
                         {it.needsConfirmation && (
-                          <p className="mt-1 text-[10px] font-semibold text-destructive">
+                          <p className="mt-1 text-xs font-semibold text-destructive">
                             ⚠️ Sujeito a confirmação
                           </p>
                         )}
                       </div>
                       <button
                         onClick={() => removeItem(it.lineId)}
-                        className="text-muted-foreground hover:text-destructive"
-                        aria-label="Remover"
+                        className="-mr-2 -mt-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-destructive"
+                        aria-label={`Remover ${it.productName}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -160,21 +169,35 @@ export function CartDrawer() {
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center gap-2 rounded-full border border-border bg-background p-1">
                         <button
-                          onClick={() => updateQty(it.lineId, it.quantity - 1)}
-                          className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
-                          aria-label="Diminuir"
+                          onClick={() =>
+                            it.quantity <= 1 ? removeItem(it.lineId) : updateQty(it.lineId, it.quantity - 1)
+                          }
+                          className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted"
+                          aria-label={
+                            it.quantity <= 1
+                              ? `Remover ${it.productName}`
+                              : `Diminuir quantidade de ${it.productName}`
+                          }
                         >
-                          <Minus className="h-3.5 w-3.5" />
+                          {it.quantity <= 1 ? (
+                            <Trash2 className="h-4 w-4" />
+                          ) : (
+                            <Minus className="h-4 w-4" />
+                          )}
                         </button>
-                        <span className="w-6 text-center text-sm font-semibold">
+                        <span
+                          className="w-7 text-center text-sm font-semibold"
+                          aria-live="polite"
+                          aria-label={`${it.quantity} ${it.quantity === 1 ? "unidade" : "unidades"}`}
+                        >
                           {it.quantity}
                         </span>
                         <button
                           onClick={() => updateQty(it.lineId, it.quantity + 1)}
-                          className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
-                          aria-label="Aumentar"
+                          className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted"
+                          aria-label={`Aumentar quantidade de ${it.productName}`}
                         >
-                          <Plus className="h-3.5 w-3.5" />
+                          <Plus className="h-4 w-4" />
                         </button>
                       </div>
                       <p className="font-display text-lg font-bold text-primary">
@@ -184,26 +207,6 @@ export function CartDrawer() {
                   </li>
                 ))}
               </ul>
-
-              {suggestions.length > 0 && (
-                <div className="mt-6 rounded-2xl border border-gold/40 bg-gold/5 py-4">
-                  <p className="flex items-center gap-1.5 px-4 font-display text-sm font-semibold text-chocolate">
-                    <Sparkles className="h-4 w-4 text-gold" />
-                    Que tal acrescentar?
-                  </p>
-                  <p className="mt-0.5 px-4 text-[11px] text-muted-foreground">
-                    Deslize pro lado pra ver mais
-                  </p>
-                  <SuggestionCarousel suggestions={suggestions} onAdd={(id) => addSuggestion(id)} />
-                  {picking && (
-                    <SuggestionFlavorSheet
-                      product={picking}
-                      onPick={(f) => addSuggestion(picking.id, f)}
-                      onClose={() => setPickingId(null)}
-                    />
-                  )}
-                </div>
-              )}
 
               {giftMin > 0 && (
                 <div
@@ -255,12 +258,32 @@ export function CartDrawer() {
                   <strong>{brl(MIN_ORDER - subtotal)}</strong> pra liberar o pedido.
                 </div>
               )}
+              {suggestions.length > 0 && (
+                <div className="mt-5 rounded-2xl border border-gold/40 bg-gold/5 py-4">
+                  <p className="flex items-center gap-1.5 px-4 font-display text-sm font-semibold text-chocolate">
+                    <Sparkles className="h-4 w-4 text-gold" />
+                    Que tal acrescentar?
+                  </p>
+                  <p className="mt-0.5 px-4 text-xs text-muted-foreground">
+                    Deslize pro lado pra ver mais
+                  </p>
+                  <SuggestionCarousel suggestions={suggestions} onAdd={(id) => addSuggestion(id)} />
+                  {picking && (
+                    <SuggestionFlavorSheet
+                      product={picking}
+                      onPick={(f) => addSuggestion(picking.id, f)}
+                      onClose={() => setPickingId(null)}
+                    />
+                  )}
+                </div>
+              )}
+
             </>
           )}
         </div>
 
         {items.length > 0 && (
-          <div className="absolute bottom-0 left-0 right-0 border-t border-border bg-background/95 p-4 shadow-[0_-8px_24px_-8px_rgba(61,26,94,0.25)] backdrop-blur">
+          <div className="absolute bottom-0 left-0 right-0 border-t border-border bg-background p-4 shadow-[0_-8px_24px_-8px_rgba(61,26,94,0.25)]">
             <Button
               size="lg"
               disabled={subtotal < MIN_ORDER}

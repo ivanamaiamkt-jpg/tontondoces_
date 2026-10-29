@@ -52,6 +52,8 @@ type OrderContextValue = {
   customer: Customer | null;
   customerPromptOpen: boolean;
   confirmCustomer: (c: Customer) => void;
+  /** Fecha a janela de nome/WhatsApp sem cadastrar (o item que a cliente tocou não é adicionado). */
+  cancelCustomerPrompt: () => void;
   /** If customer not set yet, opens modal and runs `then` after confirm. Returns true if action ran immediately. */
   ensureCustomer: (then: () => void) => boolean;
 };
@@ -90,21 +92,39 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_CART, JSON.stringify(items));
-    if (customer && items.length > 0) {
-      syncAbandonedCart({ nome: customer.name, telefone: customer.phone, items });
+    try {
+      localStorage.setItem(STORAGE_CART, JSON.stringify(items));
+    } catch {
+      // sem armazenamento (aba anônima etc.): o carrinho segue funcionando só nesta visita
     }
+    if (!customer || items.length === 0) return;
+    // Espera ~1,5 s sem mexer no carrinho antes de avisar o banco (cada + e − gerava uma chamada).
+    const t = setTimeout(() => {
+      void syncAbandonedCart({ nome: customer.name, telefone: customer.phone, items });
+    }, 1500);
+    return () => clearTimeout(t);
   }, [items, customer]);
 
   const pushItem = (item: AddItemPayload) => {
-    setItems((prev) => [
-      ...prev,
-      {
-        ...item,
-        quantity: item.quantity ?? 1,
-        lineId: Math.random().toString(36).slice(2, 10),
-      },
-    ]);
+    const qty = item.quantity ?? 1;
+    setItems((prev) => {
+      // Mesmo produto, mesmo sabor e mesmo preço: soma na linha que já existe (em vez de criar outra).
+      const same = (it: CartItem) =>
+        !item.eventDate &&
+        !it.eventDate &&
+        it.productId === item.productId &&
+        it.unitPrice === item.unitPrice &&
+        (it.via ?? "") === (item.via ?? "") &&
+        it.flavorLabels.join("|") === item.flavorLabels.join("|");
+      const idx = prev.findIndex(same);
+      if (idx >= 0) {
+        return prev.map((it, i) => (i === idx ? { ...it, quantity: it.quantity + qty } : it));
+      }
+      return [
+        ...prev,
+        { ...item, quantity: qty, lineId: Math.random().toString(36).slice(2, 10) },
+      ];
+    });
     // Não abrimos o carrinho automaticamente — cliente continua comprando.
   };
 
@@ -158,6 +178,12 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     if (action) action();
   };
 
+  const cancelCustomerPrompt = () => {
+    pendingItemRef.current = null;
+    pendingActionRef.current = null;
+    setCustomerPromptOpen(false);
+  };
+
   const ensureCustomer: OrderContextValue["ensureCustomer"] = (then) => {
     if (customerRef.current) {
       then();
@@ -206,6 +232,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         customer,
         customerPromptOpen,
         confirmCustomer,
+        cancelCustomerPrompt,
         ensureCustomer,
       }}
     >

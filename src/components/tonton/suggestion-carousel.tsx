@@ -76,25 +76,25 @@ export function SuggestionCarousel({
               </div>
               <div className="flex min-w-0 flex-1 flex-col">
                 {(promo || s.badge) && (
-                  <span className="mb-0.5 w-fit rounded-full bg-gold/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-primary">
+                  <span className="mb-0.5 w-fit rounded-full bg-gold/20 px-1.5 py-px text-xs font-bold uppercase tracking-wider text-primary">
                     {s.badge ?? "Promoção"}
                   </span>
                 )}
                 <p className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">
                   {s.name}
                 </p>
-                <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
                   {s.description}
                 </p>
                 <div className="mt-auto flex items-end justify-between gap-2 pt-1.5">
                   <div className="leading-none">
                     {promo && (
-                      <p className="text-[10px] text-muted-foreground line-through">
+                      <p className="text-xs text-muted-foreground line-through">
                         {brl(s.originalPrice!)}
                       </p>
                     )}
                     {varies && (
-                      <p className="text-[10px] text-muted-foreground">a partir de</p>
+                      <p className="text-xs text-muted-foreground">a partir de</p>
                     )}
                     <p className="text-sm font-bold text-primary">{brl(fromPrice)}</p>
                   </div>
@@ -151,7 +151,7 @@ export function SuggestionFlavorSheet({
     <div className="mx-4 mt-3 rounded-xl border-2 border-primary/30 bg-card p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary">
             Escolha o sabor
           </p>
           <p className="truncate text-xs text-muted-foreground">{product.name}</p>
@@ -175,7 +175,7 @@ export function SuggestionFlavorSheet({
             >
               <span className="min-w-0">
                 <span className="block text-xs font-semibold text-foreground">{f.name}</span>
-                <span className="mt-0.5 line-clamp-2 block text-[11px] leading-snug text-muted-foreground">
+                <span className="mt-0.5 line-clamp-2 block text-xs leading-snug text-muted-foreground">
                   {f.description}
                 </span>
               </span>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   X,
   Check,
@@ -18,6 +18,8 @@ import { PAIR_PROMO_LABEL } from "@/lib/pair-promo";
 import { PAYMENTS_BY_RECEIVING, type PaymentMethod } from "@/lib/payment";
 import { giftOrderItem, GIFT_LABEL, useGiftMin } from "@/lib/gift";
 import { rememberOrderId } from "@/lib/my-orders";
+import { usePixKey } from "@/lib/pix";
+import { useDialogA11y } from "@/lib/use-dialog";
 import { brl, maskPhone, maskCep } from "@/lib/format";
 import {
   lookupCepClient,
@@ -38,8 +40,6 @@ import { syncAbandonedCart, markCartConverted } from "@/lib/abandoned-cart";
 import { getStoredUtm } from "@/lib/analytics";
 import { getStoreStatus } from "@/lib/store-hours";
 import { isPaused, PAUSE_WHATSAPP_NOTE } from "@/lib/pause-mode";
-
-const PIX_KEY = "diretorios.tonton@gmail.com";
 
 type Receiving = "pickup" | "uber" | "delivery";
 
@@ -103,6 +103,15 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
   } | null>(null);
   const [sent, setSent] = useState(false);
   const [storeStatus, setStoreStatus] = useState(() => getStoreStatus());
+  const pixKey = usePixKey();
+  const uid = useId();
+  // Código do pedido e número ficam os mesmos se o cliente tentar de novo (evita pedido duplicado).
+  const orderUuidRef = useRef<string | null>(null);
+  const orderNumberRef = useRef<string | null>(null);
+  // Esc fecha o checkout (na tela final não: lá o pedido já foi criado e falta mandar pelo WhatsApp).
+  const dialogRef = useDialogA11y<HTMLDivElement>(open, () => {
+    if (!confirmed) onClose();
+  });
 
   useEffect(() => {
     const id = setInterval(() => setStoreStatus(getStoreStatus()), 60_000);
@@ -204,46 +213,86 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
   const handleSubmit = async () => {
     if (!step1Valid || !receiving || !step2Valid || submitting || subtotal < MIN_ORDER) return;
     setSubmitting(true);
-    const orderId = `TT-${Date.now().toString().slice(-6)}`;
+    try {
+      await placeOrder(receiving);
+    } catch (e) {
+      console.error("Erro ao finalizar o pedido:", e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
+  const newOrderNumber = () => `TT-${Math.floor(100000 + Math.random() * 900000)}`;
+
+  const placeOrder = async (receivingNow: Receiving) => {
     // O código do pedido é criado aqui (e não pelo banco) pra o aparelho poder guardá-lo e mostrar
     // o pedido em "Meus pedidos" — a leitura direta da tabela de pedidos foi fechada.
-    const orderUuid =
-      typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : undefined;
-    try {
-      const { error: insertError } = (await supabase.from("orders" as never).insert({
-        ...(orderUuid ? { id: orderUuid } : {}),
-        order_number: orderId,
-        customer_id: customer?.id ?? null,
-        customer_name: name,
-        customer_phone: phoneDigits,
-        delivery_mode: receiving,
-        ...(receiving === "delivery" && approvedQuote
-          ? {
-              street: approvedQuote.address.street,
-              number: number.trim(),
-              complement: complement.trim() || null,
-              neighborhood: approvedQuote.address.neighborhood,
-              city: approvedQuote.address.city,
-              cep: approvedQuote.address.cep,
-              delivery_km: approvedQuote.km,
-            }
-          : {}),
-        items: (hasGift ? [...items, giftOrderItem()] : items) as unknown as object,
-        subtotal,
-        ...(discount > 0 ? { discount } : {}),
-        delivery_fee: deliveryFee,
-        total,
-        payment_method: effectivePayment,
-        notes: notes || null,
-        status: "novo",
-        ...getStoredUtm(),
-      } as never)) as unknown as { error: unknown };
-      if (insertError) console.error("Erro ao salvar pedido:", insertError);
-      else if (orderUuid) rememberOrderId(orderUuid);
-    } catch (e) {
-      console.error("Erro ao salvar pedido:", e);
+    orderUuidRef.current ??=
+      typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : null;
+    orderNumberRef.current ??= newOrderNumber();
+    const orderUuid = orderUuidRef.current ?? undefined;
+    let orderId = orderNumberRef.current;
+
+    const buildRow = (num: string) => ({
+      ...(orderUuid ? { id: orderUuid } : {}),
+      order_number: num,
+      customer_id: customer?.id ?? null,
+      customer_name: name,
+      customer_phone: phoneDigits,
+      delivery_mode: receivingNow,
+      ...(receivingNow === "delivery" && approvedQuote
+        ? {
+            street: approvedQuote.address.street,
+            number: number.trim(),
+            complement: complement.trim() || null,
+            neighborhood: approvedQuote.address.neighborhood,
+            city: approvedQuote.address.city,
+            cep: approvedQuote.address.cep,
+            delivery_km: approvedQuote.km,
+          }
+        : {}),
+      items: (hasGift ? [...items, giftOrderItem()] : items) as unknown as object,
+      subtotal,
+      ...(discount > 0 ? { discount } : {}),
+      delivery_fee: deliveryFee,
+      total,
+      payment_method: effectivePayment,
+      notes: notes || null,
+      status: "novo",
+      ...getStoredUtm(),
+    });
+
+    type InsertResult = { error: { code?: string; message?: string } | null };
+    let saved = false;
+    for (let attempt = 0; attempt < 3 && !saved; attempt++) {
+      // Sem resposta em 8 s a gente segue (o pedido ainda vai pelo WhatsApp): antes o botão ficava
+      // "Confirmando..." pra sempre numa rede que não responde.
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      let numberTaken = false;
+      try {
+        const { error } = await (
+          supabase.from("orders" as never).insert(buildRow(orderId) as never) as unknown as {
+            abortSignal: (s: AbortSignal) => PromiseLike<InsertResult>;
+          }
+        ).abortSignal(ctrl.signal);
+        if (!error) saved = true;
+        else if (error.code === "23505") {
+          // Número já usado por outro pedido: sorteia outro. Mesmo código de pedido: a tentativa
+          // anterior chegou ao banco (a resposta é que se perdeu), então está salvo.
+          if ((error.message ?? "").includes("order_number")) numberTaken = true;
+          else saved = true;
+        } else console.error("Erro ao salvar pedido:", error);
+      } catch (e) {
+        console.error("Erro ao salvar pedido:", e);
+      } finally {
+        clearTimeout(timer);
+      }
+      if (!numberTaken) break;
+      orderId = newOrderNumber();
+      orderNumberRef.current = orderId;
     }
+    if (saved && orderUuid) rememberOrderId(orderUuid);
 
     const lines: string[] = [];
     lines.push(`*Novo pedido TonTon Doces #${orderId}*`);
@@ -264,8 +313,8 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
       lines.push(`*Subtotal:* ${brl(subtotal)}`);
       lines.push(`*Desconto ${PAIR_PROMO_LABEL}:* − ${brl(discount)}`);
     }
-    lines.push(`*Recebimento:* ${RECEIVING_WHATSAPP[receiving]}`);
-    if (receiving === "delivery" && approvedQuote) {
+    lines.push(`*Recebimento:* ${RECEIVING_WHATSAPP[receivingNow]}`);
+    if (receivingNow === "delivery" && approvedQuote) {
       lines.push(`*Endereço:* ${addressLine}`);
       lines.push(
         `*Taxa de entrega:* ${brl(deliveryFee)} (${String(approvedQuote.km).replace(".", ",")} km${approvedQuote.precise ? "" : ", distância estimada"})`,
@@ -275,7 +324,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     lines.push(`*Total:* ${brl(total)}`);
     lines.push("");
     lines.push(
-      `*Pagamento:* ${effectivePayment === "pix" ? "PIX (chave enviada após confirmação)" : effectivePayment === "link" ? "Link de pagamento (a TonTon envia o link pelo WhatsApp)" : receiving === "delivery" ? "Cartão (débito ou crédito na entrega)" : "Cartão (débito ou crédito na retirada)"}`,
+      `*Pagamento:* ${effectivePayment === "pix" ? "PIX (chave enviada após confirmação)" : effectivePayment === "link" ? "Link de pagamento (a TonTon envia o link pelo WhatsApp)" : receivingNow === "delivery" ? "Cartão (débito ou crédito na entrega)" : "Cartão (débito ou crédito na retirada)"}`,
     );
     if (notes) lines.push(`*Observações:* ${notes}`);
     if (isPaused()) {
@@ -284,7 +333,6 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     }
 
     const summary = lines.join("\n");
-    await markCartConverted();
 
     trackPixel("Purchase", {
       value: total,
@@ -295,8 +343,11 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
       order_id: orderId,
     });
 
-    if (name && phoneDigits.length >= 10) {
-      void syncAbandonedCart({ nome: name, telefone: phoneDigits, items });
+    // Carrinho vira "convertido" (antes ele voltava a "ativo" logo depois e quem comprou aparecia como abandonado).
+    if (name.trim().length >= 2 && phoneDigits.length >= 10) {
+      void syncAbandonedCart({ nome: name, telefone: phoneDigits, items, status: "convertido" });
+    } else {
+      void markCartConverted(items);
     }
 
     setConfirmed({
@@ -305,16 +356,15 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
       total,
       name,
       summary,
-      receiving,
+      receiving: receivingNow,
       addressLine: addressLine || undefined,
     });
     setSent(false);
-    setSubmitting(false);
   };
 
   const copyPix = async () => {
     try {
-      await navigator.clipboard.writeText(PIX_KEY);
+      await navigator.clipboard.writeText(pixKey);
       toast.success("Chave PIX copiada! 💜");
     } catch {
       toast.error("Não consegui copiar — copia manualmente 💕");
@@ -348,6 +398,8 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
   };
 
   const finishAndClose = () => {
+    orderUuidRef.current = null;
+    orderNumberRef.current = null;
     clearCart();
     setConfirmed(null);
     setSent(false);
@@ -372,22 +424,29 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     }`;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-primary/70 backdrop-blur-sm sm:items-center">
-      <div className="flex max-h-[95vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-background shadow-2xl sm:rounded-3xl">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-primary/70 sm:items-center">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`${uid}-title`}
+        className="flex max-h-[95dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-background shadow-2xl outline-none sm:rounded-3xl"
+      >
         <div className="flex items-center justify-between border-b border-border bg-primary px-5 py-4 text-primary-foreground">
           <div className="flex items-center gap-2">
             {!confirmed && step > 1 && (
-              <button onClick={goBack} className="rounded-full p-1 hover:bg-primary-glow" aria-label="Voltar">
+              <button onClick={goBack} className="rounded-full p-2.5 hover:bg-primary-glow" aria-label="Voltar">
                 <ArrowLeft className="h-5 w-5" />
               </button>
             )}
-            <h2 className="font-display text-xl">
+            <h2 id={`${uid}-title`} className="font-display text-xl">
               {confirmed ? (sent ? "Pedido enviado!" : "Estamos quase lá 💜") : STEP_LABELS[step - 1]}
             </h2>
           </div>
           <button
             onClick={confirmed ? finishAndClose : onClose}
-            className="rounded-full p-1 hover:bg-primary-glow"
+            className="rounded-full p-2.5 hover:bg-primary-glow"
+            aria-label="Fechar"
           >
             <X className="h-5 w-5" />
           </button>
@@ -439,16 +498,16 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                 </p>
                 <div className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
                   <code className="flex-1 truncate text-sm font-medium text-foreground">
-                    {PIX_KEY}
+                    {pixKey}
                   </code>
                   <button
                     onClick={copyPix}
-                    className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-glow"
+                    className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary-glow"
                   >
                     <Copy className="h-3.5 w-3.5" /> Copiar
                   </button>
                 </div>
-                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                   Após pagar, envie o comprovante junto com o pedido pelo WhatsApp 💕
                 </p>
               </div>
@@ -459,7 +518,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                 <p className="font-display text-sm font-semibold text-primary">
                   🔗 Link de pagamento
                 </p>
-                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                   Envie o pedido pelo WhatsApp que a gente cria o link e manda pra você pagar online
                   💕
                 </p>
@@ -480,7 +539,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                   🛵 Entrega — em média {delivery.etaMin} minutos
                 </p>
                 <p className="mt-2 text-sm text-foreground">{confirmed.addressLine}</p>
-                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                   Avisamos no WhatsApp quando o pedido sair 💕
                 </p>
               </div>
@@ -498,12 +557,12 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                     navigator.clipboard.writeText(STORE_ADDRESS);
                     toast.success("Endereço copiado!");
                   }}
-                  className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-glow"
+                  className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary-glow"
                 >
                   <Copy className="h-3.5 w-3.5" /> Copiar
                 </button>
               </div>
-              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                 {confirmed.receiving === "uber"
                   ? "Quando avisarmos que está pronto, cole esse endereço no app do Uber/99."
                   : "Avisamos no WhatsApp quando estiver pronto 💕"}
@@ -516,12 +575,12 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                 <Button
                   onClick={sendWhatsapp}
                   size="lg"
-                  className="mt-5 w-full bg-[#25D366] text-base font-semibold text-white hover:bg-[#1fb955]"
+                  className="mt-5 w-full bg-[#0E7A3E] text-base font-semibold text-white hover:bg-[#0b6633]"
                 >
                   <MessageCircle className="mr-2 h-5 w-5" />
                   📲 Enviar pedido pelo WhatsApp
                 </Button>
-                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                   Seu pedido só será confirmado após o envio pelo WhatsApp.
                 </p>
               </>
@@ -561,20 +620,24 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
               {step === 1 && (
                 <>
                   <div>
-                    <Label>Seu nome *</Label>
+                    <Label htmlFor={`${uid}-name`}>Seu nome *</Label>
                     <Input
+                      id={`${uid}-name`}
+                      autoComplete="name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="mt-1"
+                      className="mt-1 h-11"
                       placeholder="Como prefere ser chamada"
                     />
                   </div>
                   <div>
-                    <Label>WhatsApp *</Label>
+                    <Label htmlFor={`${uid}-phone`}>WhatsApp *</Label>
                     <Input
+                      id={`${uid}-phone`}
+                      autoComplete="tel-national"
                       value={phone}
                       onChange={(e) => setPhone(maskPhone(e.target.value))}
-                      className="mt-1"
+                      className="mt-1 h-11"
                       placeholder="(11) 99999-9999"
                       inputMode="tel"
                     />
@@ -607,34 +670,36 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                       {receiving === "delivery" && (
                         <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
                           <div>
-                            <Label>CEP *</Label>
+                            <Label htmlFor={`${uid}-cep`}>CEP *</Label>
                             <Input
+                              id={`${uid}-cep`}
+                              aria-invalid={cepState.kind === "notfound" || cepState.kind === "error"}
                               value={cep}
                               onChange={(e) => handleCepChange(e.target.value)}
-                              className="mt-1"
+                              className="mt-1 h-11"
                               placeholder="00000-000"
                               inputMode="numeric"
                               autoComplete="postal-code"
                             />
                             {cepState.kind === "loading" && (
-                              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                              <p role="status" className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                                 <Loader2 className="h-3 w-3 animate-spin" /> Buscando o CEP...
                               </p>
                             )}
                             {cepState.kind === "notfound" && (
-                              <p className="mt-1 text-xs text-destructive">
+                              <p role="alert" className="mt-1 text-xs text-destructive">
                                 CEP não encontrado. Confere o número?
                               </p>
                             )}
                             {cepState.kind === "error" && (
-                              <p className="mt-1 text-xs text-destructive">
+                              <p role="alert" className="mt-1 text-xs text-destructive">
                                 Não consegui consultar o CEP. Tenta de novo?
                               </p>
                             )}
                           </div>
 
                           {cepState.kind === "othercity" && (
-                            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                            <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
                               Entregamos só em Sorocaba. Pra outra cidade, você pode chamar um Uber.
                             </div>
                           )}
@@ -642,12 +707,13 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                           {cepState.kind === "ok" && (
                             <>
                               <div>
-                                <Label>Rua *</Label>
+                                <Label htmlFor={`${uid}-street`}>Rua *</Label>
                                 <Input
+                                  id={`${uid}-street`}
                                   value={streetTyped}
                                   onChange={(e) => setStreetTyped(e.target.value)}
                                   readOnly={cepState.info.street !== ""}
-                                  className="mt-1"
+                                  className="mt-1 h-11"
                                   placeholder="Nome da rua"
                                 />
                                 <p className="mt-1 text-xs text-muted-foreground">
@@ -657,21 +723,23 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                               </div>
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                  <Label>Número *</Label>
+                                  <Label htmlFor={`${uid}-number`}>Número *</Label>
                                   <Input
+                                    id={`${uid}-number`}
                                     value={number}
                                     onChange={(e) => setNumber(e.target.value.slice(0, 12))}
-                                    className="mt-1"
+                                    className="mt-1 h-11"
                                     placeholder="123"
-                                    inputMode="numeric"
+                                    autoComplete="off"
                                   />
                                 </div>
                                 <div>
-                                  <Label>Complemento</Label>
+                                  <Label htmlFor={`${uid}-complement`}>Complemento</Label>
                                   <Input
+                                    id={`${uid}-complement`}
                                     value={complement}
                                     onChange={(e) => setComplement(e.target.value)}
-                                    className="mt-1"
+                                    className="mt-1 h-11"
                                     placeholder="Apto, bloco..."
                                   />
                                 </div>
@@ -680,19 +748,19 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                           )}
 
                           {quoteState.kind === "loading" && (
-                            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Loader2 className="h-4 w-4 animate-spin" /> Calculando a taxa de
                               entrega...
                             </p>
                           )}
                           {quoteState.kind === "error" && (
-                            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                            <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
                               Não consegui calcular a taxa agora. Tenta de novo em instantes, ou
                               chama a gente no WhatsApp.
                             </div>
                           )}
                           {quoteState.kind === "done" && quoteState.quote.status === "ok" && (
-                            <div className="rounded-xl border border-green-300 bg-green-50 px-3 py-2.5 text-sm font-medium text-green-800">
+                            <div role="status" className="rounded-xl border border-green-300 bg-green-50 px-3 py-2.5 text-sm font-medium text-green-800">
                               Entrega para {quoteState.quote.address.neighborhood}:{" "}
                               <strong>{brl(quoteState.quote.fee)}</strong> (
                               {String(quoteState.quote.km).replace(".", ",")} km). Tempo médio:{" "}
@@ -702,7 +770,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                           {quoteState.kind === "done" &&
                             quoteState.quote.status === "out" &&
                             quoteState.quote.reason === "distancia" && (
-                              <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                              <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
                                 Esse endereço fica fora da nossa área de entrega (até{" "}
                                 {delivery.maxKm} km da loja). Você pode retirar na loja ou chamar
                                 um Uber.
@@ -711,18 +779,18 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                           {quoteState.kind === "done" &&
                             quoteState.quote.status === "out" &&
                             quoteState.quote.reason === "cidade" && (
-                              <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                              <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
                                 Entregamos só em Sorocaba. Pra outra cidade, você pode chamar um
                                 Uber.
                               </div>
                             )}
                           {quoteState.kind === "done" && quoteState.quote.status === "invalid" && (
-                            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                            <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
                               Confere o CEP e o número do endereço.
                             </div>
                           )}
                           {quoteState.kind === "done" && quoteState.quote.status === "confirm" && (
-                            <div className="space-y-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                            <div role="status" className="space-y-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
                               <p>
                                 Não consegui confirmar a distância desse endereço. Chama a gente
                                 no WhatsApp que a gente confirma a taxa, ou escolhe retirar ou
@@ -732,7 +800,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                                 href={whatsappConfirmLink()}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1fb955]"
+                                className="inline-flex items-center gap-1 rounded-lg bg-[#0E7A3E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0b6633]"
                               >
                                 <MessageCircle className="h-3.5 w-3.5" /> Confirmar pelo WhatsApp
                               </a>
@@ -811,6 +879,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                     <div className="mt-2 grid grid-cols-1 gap-2">
                       <button
                         type="button"
+                        aria-pressed={effectivePayment === "pix"}
                         onClick={() => setPayment("pix")}
                         className={`rounded-xl border-2 p-3 text-left text-sm transition ${
                           effectivePayment === "pix"
@@ -826,7 +895,8 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                       {allowedPayments.includes("maquininha") && (
                         <button
                           type="button"
-                          onClick={() => setPayment("maquininha")}
+                          aria-pressed={effectivePayment === "maquininha"}
+                        onClick={() => setPayment("maquininha")}
                           className={`rounded-xl border-2 p-3 text-left text-sm transition ${
                             effectivePayment === "maquininha"
                               ? "border-primary bg-primary/5"
@@ -844,7 +914,8 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                       {allowedPayments.includes("link") && (
                         <button
                           type="button"
-                          onClick={() => setPayment("link")}
+                          aria-pressed={effectivePayment === "link"}
+                        onClick={() => setPayment("link")}
                           className={`rounded-xl border-2 p-3 text-left text-sm transition ${
                             effectivePayment === "link"
                               ? "border-primary bg-primary/5"
@@ -866,8 +937,9 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                   </div>
 
                   <div>
-                    <Label>Observações</Label>
+                    <Label htmlFor={`${uid}-notes`}>Observações</Label>
                     <Textarea
+                      id={`${uid}-notes`}
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       className="mt-1"
@@ -920,7 +992,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                   </div>
 
                   {subtotal < MIN_ORDER && (
-                    <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                    <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
                       ⚠️ Pedido mínimo de {brl(MIN_ORDER)}. Faltam{" "}
                       <strong>{brl(MIN_ORDER - subtotal)}</strong> para liberar o pedido.
                     </div>

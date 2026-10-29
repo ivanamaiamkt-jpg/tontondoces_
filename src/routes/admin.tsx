@@ -14,6 +14,8 @@ import {
   Wallet,
   Eye,
 } from "lucide-react";
+import { useOrderAlerts } from "@/lib/order-alerts";
+import { OrderAlertBanner, OrderAlertPanel } from "@/components/admin/order-alerts-ui";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -61,6 +63,9 @@ function AdminLayout() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [email, setEmail] = useState<string>("");
   const [openMobile, setOpenMobile] = useState(false);
+  // Aviso de pedido novo: vale em qualquer tela do painel (som, faixa fixa, título piscando).
+  const alerts = useOrderAlerts();
+  const pendingCount = alerts.pending.length;
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? ""));
@@ -73,6 +78,7 @@ function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-muted/30">
+      <OrderAlertBanner alerts={alerts} />
       {/* Top bar mobile */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background px-4 py-3 lg:hidden">
         <Link to="/admin" className="flex items-center gap-2">
@@ -119,11 +125,17 @@ function AdminLayout() {
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label}
+                  {item.to === "/admin/pedidos" && pendingCount > 0 && (
+                    <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-green-600 px-1.5 text-[11px] font-bold text-white">
+                      {pendingCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}
           </nav>
           <div className="border-t border-border p-3">
+            <OrderAlertPanel alerts={alerts} />
             <p className="truncate px-2 text-xs text-muted-foreground">{email}</p>
             <button
               onClick={logout}

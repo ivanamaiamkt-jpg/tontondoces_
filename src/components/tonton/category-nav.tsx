@@ -4,6 +4,9 @@ import { CATEGORIES, type Category } from "@/lib/menu-data";
 export function CategoryNav({ categories = CATEGORIES }: { categories?: Category[] }) {
   const [activeId, setActiveId] = useState<string>(categories[0]?.id ?? "");
   const navRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLElement>(null);
+  // Altura real da barra fixa (o deslocamento da rolagem usava um número chutado e sobrava uma faixa).
+  const barHeight = () => barRef.current?.offsetHeight ?? 48;
 
   // Observa qual seção está visível
   useEffect(() => {
@@ -19,7 +22,7 @@ export function CategoryNav({ categories = CATEGORIES }: { categories?: Category
       },
       {
         // Considera "ativo" o que está na faixa abaixo do header sticky
-        rootMargin: "-160px 0px -55% 0px",
+        rootMargin: `-${barHeight() + 24}px 0px -55% 0px`,
         threshold: [0, 0.25, 0.5, 0.75, 1],
       },
     );
@@ -41,7 +44,7 @@ export function CategoryNav({ categories = CATEGORIES }: { categories?: Category
     const activeBtn = nav.querySelector<HTMLAnchorElement>(`a[data-cat-id="${activeId}"]`);
     if (activeBtn) {
       activeBtn.scrollIntoView({
-        behavior: "smooth",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
         inline: "center",
         block: "nearest",
       });
@@ -52,16 +55,19 @@ export function CategoryNav({ categories = CATEGORIES }: { categories?: Category
     e.preventDefault();
     const el = document.getElementById(`cat-${id}`);
     if (!el) return;
-    // Offset por causa do header + nav stickys (~140px)
-    const top = el.getBoundingClientRect().top + window.scrollY - 140;
-    window.scrollTo({ top, behavior: "smooth" });
+    const top = el.getBoundingClientRect().top + window.scrollY - barHeight() - 8;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top, behavior: reduce ? "auto" : "smooth" });
     setActiveId(id);
   };
 
   return (
-    <nav className="sticky top-0 z-30 border-b border-border/60 bg-background/95 backdrop-blur">
-      {/* pr-24/pr-40: o botão flutuante do carrinho fica por cima da barra; as abas rolam só até antes dele */}
-      <div className="mx-auto max-w-5xl pr-24 sm:pr-40 xl:pr-0">
+    <nav
+      ref={barRef}
+      aria-label="Categorias do cardápio"
+      className="sticky top-0 z-30 border-b border-border/60 bg-background/95"
+    >
+      <div className="mx-auto max-w-5xl">
         <div
           ref={navRef}
           className="flex gap-1 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -74,7 +80,8 @@ export function CategoryNav({ categories = CATEGORIES }: { categories?: Category
                 href={`#cat-${cat.id}`}
                 data-cat-id={cat.id}
                 onClick={(e) => handleClick(e, cat.id)}
-                className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition ${
+                aria-current={active ? "true" : undefined}
+                className={`inline-flex min-h-10 shrink-0 items-center rounded-full px-4 py-1.5 text-[13px] font-medium transition ${
                   active
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-foreground/70 hover:text-primary"

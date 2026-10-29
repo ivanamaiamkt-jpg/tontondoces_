@@ -24,7 +24,10 @@ export function registerServiceWorker() {
     return;
   }
 
-  window.addEventListener("load", () => {
+  const register = () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
-  });
+  };
+  // O efeito pode rodar depois do evento "load": registra na hora nesse caso.
+  if (document.readyState === "complete") register();
+  else window.addEventListener("load", register);
 }

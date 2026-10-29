@@ -9,11 +9,16 @@ export type AvailabilityState = {
   archived: Set<string>;
 };
 
-export async function getAvailabilityState(): Promise<AvailabilityState> {
-  const { data } = (await supabase
+/** Devolve null se a consulta falhar: quem chama mantém o estado que já tinha (não "zera" esgotados/arquivados). */
+export async function getAvailabilityState(): Promise<AvailabilityState | null> {
+  const { data, error } = (await supabase
     .from("product_availability" as never)
-    .select("product_id,is_available,archived")) as unknown as { data: AvailabilityRow[] | null };
-  const rows = data ?? [];
+    .select("product_id,is_available,archived")) as unknown as {
+    data: AvailabilityRow[] | null;
+    error: unknown;
+  };
+  if (error || !data) return null;
+  const rows = data;
   return {
     soldOut: new Set(rows.filter((r) => !r.is_available).map((r) => r.product_id)),
     archived: new Set(rows.filter((r) => r.archived).map((r) => r.product_id)),

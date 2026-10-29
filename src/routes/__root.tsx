@@ -57,8 +57,7 @@ export const Route = createRootRoute({
       { rel: "icon", href: "/icon-192.png", type: "image/png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "preconnect", href: "https://nominatim.openstreetmap.org" },
-      { rel: "preconnect", href: "https://viacep.com.br" },
+      { rel: "preconnect", href: "https://sirdbsmyrxfdpvjryogj.supabase.co", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap",
@@ -66,10 +65,9 @@ export const Route = createRootRoute({
     ],
     scripts: [
       {
-        children: `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','902455499492362');fbq('track','PageView');fbq('track','ViewContent');`,
-      },
-      {
-        children: `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window, document, "clarity", "script", "wngepph1g8");`,
+        // Pixel e Clarity: a fila de eventos fica pronta já, mas os scripts só baixam depois da
+        // página carregar (não disputam banda com as fotos) e não rodam no painel nem no link do motoboy.
+        children: `!function(){if(/^\\/(admin|entrega)/.test(location.pathname))return;var f=window,b=document;if(!f.fbq){var n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[]}fbq('init','902455499492362');fbq('track','PageView');fbq('track','ViewContent');f.clarity=f.clarity||function(){(f.clarity.q=f.clarity.q||[]).push(arguments)};var load=function(){var s=b.getElementsByTagName('script')[0],t=b.createElement('script');t.async=!0;t.src='https://connect.facebook.net/en_US/fbevents.js';s.parentNode.insertBefore(t,s);var c=b.createElement('script');c.async=!0;c.src='https://www.clarity.ms/tag/wngepph1g8';s.parentNode.insertBefore(c,s)};var later=function(){(f.requestIdleCallback||function(fn){setTimeout(fn,1500)})(load)};b.readyState==='complete'?later():f.addEventListener('load',later)}();`,
       },
     ],
   }),
@@ -80,7 +78,7 @@ export const Route = createRootRoute({
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
       </head>
@@ -111,7 +109,7 @@ function RootComponent() {
     <OrderProvider>
       <Outlet />
       <CustomerCaptureModal />
-      <Toaster richColors position="top-center" />
+      <Toaster position="top-center" />
     </OrderProvider>
   );
 }

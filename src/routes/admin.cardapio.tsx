@@ -74,8 +74,11 @@ function CardapioAdminPage() {
       getCustomCategories(),
       getCustomProducts(),
     ]);
-    setSoldOut(availabilityRes.soldOut);
-    setArchived(availabilityRes.archived);
+    // No painel, se a consulta falhar o estado anterior é mantido (não mostra tudo como disponível).
+    if (availabilityRes) {
+      setSoldOut(availabilityRes.soldOut);
+      setArchived(availabilityRes.archived);
+    }
     setOverrides(overridesRes);
     setCustomCategories(customCatsRes);
     setCustomProducts(customProdsRes);

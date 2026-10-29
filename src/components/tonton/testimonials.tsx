@@ -72,7 +72,7 @@ export function Testimonials() {
             O que dizem
           </h2>
           <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1.5 shadow-sm">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Avaliações no
             </span>
             <GoogleLogo className="h-3.5 w-auto" />
@@ -97,7 +97,7 @@ export function Testimonials() {
                     <Star key={idx} className="h-3.5 w-3.5 fill-gold" />
                   ))}
                 </div>
-                <span className="text-[11px] text-muted-foreground">{t.timeAgo}</span>
+                <span className="text-xs text-muted-foreground">{t.timeAgo}</span>
               </div>
               <p className="mt-3 text-sm leading-relaxed text-foreground/85">
                 "{t.text}"

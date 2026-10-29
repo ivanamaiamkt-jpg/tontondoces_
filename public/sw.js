@@ -1,8 +1,9 @@
 // Service Worker mínimo da TonTon Doces.
 // Estratégia: NetworkFirst para HTML, cache simples para assets estáticos.
 // Não cacheia rotas /admin nem /api para evitar dados defasados.
-const CACHE = "tonton-v1";
-const ASSETS = ["/icon-192.png", "/icon-512.png", "/manifest.json"];
+const CACHE = "tonton-v2";
+// Só o essencial: o ícone grande (512) o navegador baixa sozinho quando precisa.
+const ASSETS = ["/icon-192.png", "/manifest.json"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));

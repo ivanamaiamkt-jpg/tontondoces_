@@ -16,6 +16,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/format";
 import { OWNER_WHATSAPP } from "@/lib/menu-data";
 import { paymentLabel } from "@/lib/payment";
+import { DEFAULT_PIX_KEY, getPixKey } from "@/lib/pix";
+import { ORDERS_CHANGED_EVENT } from "@/lib/order-alerts";
 import { GIFT_INTERNAL_LABEL, GIFT_PRODUCT_ID } from "@/lib/gift";
 import { MessageCircle, Phone, Trash2, X, Check, Ban } from "lucide-react";
 import { toast } from "sonner";
@@ -31,7 +33,8 @@ export const Route = createFileRoute("/admin/pedidos")({
   component: PedidosPage,
 });
 
-const PIX_KEY = "diretorios.tonton@gmail.com";
+// Chave PIX das mensagens: começa com a padrão e troca pela de Configurações assim que carrega.
+let PIX_KEY = DEFAULT_PIX_KEY;
 const STORE_ADDRESS_SHORT = "Rua Pedro Lombardi, 890 — Vila Mineirão";
 
 type OrderItem = {
@@ -101,40 +104,6 @@ function timeAgo(iso: string, now: number) {
   if (h < 24) return `há ${h}h${rem ? ` ${rem}min` : ""}`;
   const d = Math.floor(h / 24);
   return `há ${d}d`;
-}
-
-function playBeep() {
-  try {
-    const Ctx = (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = "sine";
-    o.frequency.value = 880;
-    g.gain.setValueAtTime(0.0001, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.45);
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.start();
-    o.stop(ctx.currentTime + 0.5);
-    setTimeout(() => {
-      const o2 = ctx.createOscillator();
-      const g2 = ctx.createGain();
-      o2.type = "sine";
-      o2.frequency.value = 1175;
-      g2.gain.setValueAtTime(0.0001, ctx.currentTime);
-      g2.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
-      g2.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.45);
-      o2.connect(g2);
-      g2.connect(ctx.destination);
-      o2.start();
-      o2.stop(ctx.currentTime + 0.5);
-    }, 250);
-  } catch {
-    // ignore
-  }
 }
 
 function waLink(phone: string, message: string) {
@@ -379,19 +348,17 @@ function PedidosPage() {
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
   const [detail, setDetail] = useState<Order | null>(null);
-  const [banner, setBanner] = useState<{ name: string; total: number } | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [motoboyWhatsapp, setMotoboyWhatsapp] = useState<string>("");
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
   );
-  const knownIds = useRef<Set<string>>(new Set());
-  const firstLoad = useRef(true);
-  const originalTitle = useRef<string>("");
 
   useEffect(() => {
+    void getPixKey().then((k) => {
+      PIX_KEY = k;
+    });
     (async () => {
       const { data } = (await supabase
         .from("store_settings" as never)
@@ -408,53 +375,29 @@ function PedidosPage() {
     return () => clearInterval(id);
   }, []);
 
-  // Título da aba com badge
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    if (!originalTitle.current) originalTitle.current = document.title;
-    document.title = unreadCount > 0 ? `🔴 (${unreadCount}) Pedidos — TonTon` : originalTitle.current;
-  }, [unreadCount]);
-
-  // Limpa contador ao focar a aba
-  useEffect(() => {
-    const onFocus = () => setUnreadCount(0);
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, []);
-
   const load = async () => {
     const { data } = (await supabase
       .from("orders" as never)
       .select("*")
       .order("created_at", { ascending: false })
       .limit(200)) as unknown as { data: Order[] | null };
-    const list = data ?? [];
-
-    if (firstLoad.current) {
-      list.forEach((o) => knownIds.current.add(o.id));
-      firstLoad.current = false;
-    } else {
-      const fresh = list.filter((o) => !knownIds.current.has(o.id) && o.status === "novo");
-      if (fresh.length > 0) {
-        const first = fresh[0];
-        playBeep();
-        setBanner({ name: first.customer_name, total: Number(first.total) });
-        setUnreadCount((c) => c + fresh.length);
-        setTimeout(() => setBanner(null), 5000);
-      }
-      list.forEach((o) => knownIds.current.add(o.id));
-    }
-    setOrders(list);
+    if (data) setOrders(data);
     setLoading(false);
   };
 
   useEffect(() => {
     load();
+    // Tempo real (se estiver ligado no banco) + conferência a cada 20 s + quando o aviso do painel
+    // achar pedido novo: o quadro nunca fica desatualizado.
     const channel = supabase
       .channel("admin-orders-kanban")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => load())
       .subscribe();
+    const id = setInterval(load, 20_000);
+    window.addEventListener(ORDERS_CHANGED_EVENT, load);
     return () => {
+      clearInterval(id);
+      window.removeEventListener(ORDERS_CHANGED_EVENT, load);
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -574,12 +517,6 @@ function PedidosPage() {
 
   return (
     <div>
-      {banner && (
-        <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-2 rounded-2xl bg-green-600 px-5 py-3 text-white shadow-2xl">
-          🆕 Novo pedido de <strong>{banner.name}</strong> — <strong>{brl(banner.total)}</strong>
-        </div>
-      )}
-
       <header className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl">Pedidos</h1>

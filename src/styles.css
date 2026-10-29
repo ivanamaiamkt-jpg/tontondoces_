@@ -87,7 +87,8 @@
   --destructive-foreground: oklch(0.985 0.012 80);
 
   --border: #f4d4da;
-  --input: #f4d4da;
+  /* borda dos campos de texto: mais escura que a dos cartões pra dar 3:1 de contraste */
+  --input: #ae8296;
   --ring: #5c1f5c;
 }
 
@@ -230,3 +231,14 @@
   }
 }
 
+/* Quem pediu menos movimento no aparelho não vê animações nem rolagem suave. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

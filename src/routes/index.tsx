@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Heart, Instagram, MessageCircle } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { CATEGORIES, type Category } from "@/lib/menu-data";
@@ -17,16 +17,13 @@ import { ReorderCard } from "@/components/tonton/reorder-card";
 import { PauseBanner } from "@/components/tonton/pause-banner";
 import { useOrder } from "@/contexts/order-context";
 import heroCups from "@/assets/hero-cups-photo.webp";
-import tontonLogo from "@/assets/tonton-logo-light.png";
+import tontonLogo from "@/assets/tonton-logo-light.webp";
 
 const CartDrawer = lazy(() =>
   import("@/components/tonton/cart-drawer").then((m) => ({ default: m.CartDrawer })),
 );
 const Testimonials = lazy(() =>
   import("@/components/tonton/testimonials").then((m) => ({ default: m.Testimonials })),
-);
-const SocialProofPopup = lazy(() =>
-  import("@/components/tonton/social-proof-popup").then((m) => ({ default: m.SocialProofPopup })),
 );
 
 export const Route = createFileRoute("/")({
@@ -49,13 +46,13 @@ export const Route = createFileRoute("/")({
   },
   head: () => ({
     links: [
-      { rel: "preload", as: "image", href: heroCups, fetchpriority: "high" } as any,
+      { rel: "preload", as: "image", href: heroCups, fetchPriority: "high" } as any,
     ],
   }),
 });
 
 function HomePage() {
-  const { cartOpen } = useOrder();
+  const { cartOpen, items } = useOrder();
   const minOrder = useMinOrder();
   const delivery = useDeliverySettings();
   const initial = Route.useLoaderData();
@@ -64,7 +61,9 @@ function HomePage() {
   const [merged, setMerged] = useState<Category[]>(CATEGORIES);
 
   useEffect(() => {
+    // Se a consulta falhar (rede ruim), mantém o que já veio no HTML em vez de zerar tudo.
     getAvailabilityState().then((s) => {
+      if (!s) return;
       setSoldOut(s.soldOut);
       setArchived(s.archived);
     });
@@ -80,32 +79,25 @@ function HomePage() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={`min-h-screen bg-background ${items.length > 0 && !cartOpen ? "pb-24" : ""}`}>
+      <a
+        href="#cardapio"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary-foreground"
+      >
+        Ir para o cardápio
+      </a>
       <PauseBanner />
       {/* Hero — duas colunas lado a lado */}
       <section className="hero-tonton w-full flex relative overflow-hidden">
-        <div className="hero-tonton-bg">
-          <img
-            src={heroCups}
-            alt=""
-            aria-hidden="true"
-            loading="eager"
-            fetchPriority="high"
-            decoding="async"
-            className="h-full w-full"
-            style={{ objectFit: "cover", objectPosition: "center" }}
-          />
-          <div className="hero-tonton-bg-overlay" />
-        </div>
         <div className="hero-tonton-left">
           <img
             src={tontonLogo}
             alt="TonTon Doces"
             className="hero-tonton-logo"
           />
-          <h2 className="hero-tonton-title">
+          <h1 className="hero-tonton-title">
             Brigadeiros absurdamente cremosos, prontinhos pra você buscar
-          </h2>
+          </h1>
           <p className="hero-tonton-sub">
             {delivery.enabled
               ? `📍 Entrega em até ${delivery.maxKm} km (em média ${delivery.etaMin} min) ou retirada na Vila Mineirão`
@@ -155,21 +147,31 @@ function HomePage() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Fale no WhatsApp"
-            style={{ color: "#5c1f5c", display: "inline-flex", alignItems: "center" }}
+            className="-my-3 inline-flex h-11 w-11 items-center justify-center"
+            style={{ color: "#5c1f5c" }}
           >
-            <MessageCircle size={16} strokeWidth={2.2} />
+            <MessageCircle size={18} strokeWidth={2.2} />
           </a>
           <a
             href="https://instagram.com/tontondoces_"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Instagram @tontondoces"
-            style={{ color: "#5c1f5c", display: "inline-flex", alignItems: "center" }}
+            aria-label="Instagram @tontondoces_"
+            className="-my-3 inline-flex h-11 w-11 items-center justify-center"
+            style={{ color: "#5c1f5c" }}
           >
-            <Instagram size={16} strokeWidth={2.2} />
+            <Instagram size={18} strokeWidth={2.2} />
           </a>
           <span aria-hidden>·</span>
           <span>🛒 Pedido mínimo: {brl(minOrder)}</span>
+          <span aria-hidden>·</span>
+          <Link
+            to="/meus-pedidos"
+            className="-my-3 inline-flex min-h-11 items-center font-semibold underline underline-offset-2"
+            style={{ color: "#5c1f5c" }}
+          >
+            Meus pedidos
+          </Link>
         </div>
       </section>
 
@@ -180,20 +182,20 @@ function HomePage() {
 
       {/* Menu */}
       <main id="cardapio" className="mx-auto max-w-5xl space-y-10 px-4 py-10 sm:py-14">
-        {categories.map((cat, idx) => (
+        {categories.map((cat) => (
           <section
             key={cat.id}
             id={`cat-${cat.id}`}
-            className="scroll-mt-32 space-y-4"
+            className="scroll-mt-16 space-y-4"
           >
             <CategoryBanner title={cat.title} />
-            <LazyOnVisible eager={idx === 0} minHeight={cat.products.length * 180}>
-              <div className="space-y-3">
-                {cat.products.map((p) => (
-                  <ProductCard key={p.id} product={p} soldOut={soldOut.has(p.id)} />
-                ))}
-              </div>
-            </LazyOnVisible>
+            {/* Todas as categorias vêm prontas (as fotos já carregam só quando chegam perto):
+                antes elas montavam ao rolar e a página dava um salto. */}
+            <div className="space-y-3">
+              {cat.products.map((p) => (
+                <ProductCard key={p.id} product={p} soldOut={soldOut.has(p.id)} />
+              ))}
+            </div>
           </section>
         ))}
       </main>
@@ -225,15 +227,21 @@ function HomePage() {
             <MessageCircle className="h-5 w-5" />
           </a>
           <a
-            href="https://instagram.com/tontondoces"
+            href="https://instagram.com/tontondoces_"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Instagram"
+            aria-label="Instagram @tontondoces_"
             className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-foreground/10 text-primary-foreground transition hover:bg-primary-foreground/20"
           >
             <Instagram className="h-5 w-5" />
           </a>
         </div>
+        <Link
+          to="/meus-pedidos"
+          className="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-primary-foreground/80 underline underline-offset-2 hover:text-primary-foreground"
+        >
+          Meus pedidos
+        </Link>
       </footer>
 
       {cartOpen && (
@@ -242,9 +250,6 @@ function HomePage() {
         </Suspense>
       )}
       <CartFab />
-      <Suspense fallback={null}>
-        <SocialProofPopup />
-      </Suspense>
     </div>
   );
 }

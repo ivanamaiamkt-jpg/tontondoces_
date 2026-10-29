@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Plus, Tag, CalendarClock, AlertTriangle } from "lucide-react";
 import {
   type Product,
@@ -8,6 +8,7 @@ import {
 } from "@/lib/menu-data";
 import { useOrder } from "@/contexts/order-context";
 import { brl } from "@/lib/format";
+import { priceFrom } from "@/lib/price";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { trackPixel } from "@/lib/fbq";
@@ -26,15 +27,13 @@ function FlavorPicker({
   hidePrice?: boolean;
 }) {
   return (
-    <div className="space-y-2" role="radiogroup" aria-label={`Sabor — ${name}`}>
+    <div className="space-y-2" role="group" aria-label={`Sabor — ${name}`}>
       {flavors.map((f) => {
         const selected = value === f.id;
         return (
           <button
             key={f.id}
             type="button"
-            role="radio"
-            aria-checked={selected}
             onClick={() => onChange(f.id)}
             className={`w-full rounded-xl border-2 p-3 text-left transition ${
               selected
@@ -46,7 +45,7 @@ function FlavorPicker({
               {f.image && (
                 <img
                   src={f.image}
-                  alt={f.name}
+                  alt=""
                   loading="lazy"
                   decoding="async"
                   className="h-14 w-14 shrink-0 rounded-lg object-cover"
@@ -112,6 +111,8 @@ export function ProductCard({
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
   const [qty, setQty] = useState(product.minQuantity ?? 1);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const price = priceFrom(product);
 
   const needsFlavor = !!product.flavors;
   const needsPicks = !!product.flavorPicks;
@@ -210,6 +211,8 @@ export function ProductCard({
     setEventTime("");
     setQty(product.minQuantity ?? 1);
     setOpen(false);
+    // O painel de sabores fecha e o botão em foco some: devolve o foco pro botão do cartão.
+    setTimeout(() => triggerRef.current?.focus({ preventScroll: true }), 0);
   };
 
   const handleFlavorSelect = (id: string) => {
@@ -278,7 +281,7 @@ export function ProductCard({
           <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-xl bg-muted sm:h-32 sm:w-32">
             <img
               src={product.image}
-              alt={product.name}
+              alt=""
               loading="lazy"
                   decoding="async"
               className={`h-full w-full object-cover ${soldOut ? "grayscale opacity-60" : ""}`}
@@ -288,12 +291,12 @@ export function ProductCard({
 
         <div className="flex min-w-0 flex-1 flex-col">
           {soldOut ? (
-            <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-destructive">
+            <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-destructive">
               Esgotado
             </span>
           ) : (
             product.badge && (
-              <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+              <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-primary">
                 {product.badge}
               </span>
             )
@@ -305,7 +308,7 @@ export function ProductCard({
           </div>
 
           {needsSchedule && (
-            <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-chocolate">
+            <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-chocolate">
               <CalendarClock className="h-3 w-3" /> Sob encomenda
             </span>
           )}
@@ -317,12 +320,19 @@ export function ProductCard({
           <div className="mt-auto flex items-end justify-between gap-2 pt-3">
             <div className="min-w-0">
               {hasPromo && (
-                <p className="text-[11px] text-muted-foreground line-through">
-                  {brl(product.originalPrice!)}
+                <p className="text-xs text-muted-foreground">
+                  <del>
+                    <span className="sr-only">De </span>
+                    {brl(product.originalPrice!)}
+                  </del>
                 </p>
               )}
-              <p className="font-display text-xl font-bold leading-none text-primary sm:text-2xl">
-                {brl(product.price)}
+              {price.varies && !hasPromo && (
+                <p className="text-xs text-muted-foreground">a partir de</p>
+              )}
+              <p className="font-display text-lg font-bold leading-none text-primary sm:text-2xl">
+                {hasPromo && <span className="sr-only">Por </span>}
+                {brl(price.from)}
                 {product.unitLabel && (
                   <span className="ml-1 text-xs font-medium text-muted-foreground">
                     {product.unitLabel}
@@ -338,19 +348,23 @@ export function ProductCard({
               <Button
                 onClick={handleAdd}
                 size="sm"
-                className="shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary-glow"
+                aria-label={`Pedir agora ${product.name}`}
+                className="h-10 shrink-0 rounded-full bg-primary px-4 text-[13px] text-primary-foreground hover:bg-primary-glow"
               >
                 Pedir agora
               </Button>
             ) : (
               <Button
+                ref={triggerRef}
                 onClick={() => setOpen((v) => !v)}
                 size="sm"
                 variant={open ? "secondary" : "default"}
+                aria-expanded={open}
+                aria-label={`${open ? "Fechar" : buttonLabel} ${product.name}`}
                 className={
                   open
-                    ? "shrink-0"
-                    : "shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary-glow"
+                    ? "h-10 shrink-0 rounded-full px-4 text-[13px]"
+                    : "h-10 shrink-0 rounded-full bg-primary px-4 text-[13px] text-primary-foreground hover:bg-primary-glow"
                 }
               >
                 {open ? "Fechar" : buttonLabel}
@@ -392,7 +406,10 @@ export function ProductCard({
           <div className="space-y-4 border-t border-border bg-muted/30 p-4 sm:p-5">
             {(showProgress || (steps.length === 1 && current)) && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                <p
+                  className="text-xs font-semibold uppercase tracking-wider text-primary"
+                  aria-live="polite"
+                >
                   {stepTitle}
                 </p>
                 {showProgress && (
@@ -423,7 +440,7 @@ export function ProductCard({
               const cur = picks[current.bucket] ?? [];
               return (
                 <div key={`step-pick-${stepIdx}`} className="animate-fade-in space-y-2">
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground" aria-live="polite">
                     Selecionados: {cur.length}/{current.count}
                   </p>
                   <div className="space-y-2">
@@ -433,6 +450,7 @@ export function ProductCard({
                         <button
                           key={f.id}
                           type="button"
+                          aria-pressed={selected}
                           onClick={() => handlePickToggle(current.bucket, f.id, current.count)}
                           className={`flex w-full items-start gap-3 rounded-xl border-2 p-3 text-left transition ${
                             selected
@@ -443,7 +461,7 @@ export function ProductCard({
                           {f.image && (
                             <img
                               src={f.image}
-                              alt={f.name}
+                              alt=""
                               loading="lazy"
                               decoding="async"
                               className="h-14 w-14 shrink-0 rounded-lg object-cover"
@@ -474,7 +492,7 @@ export function ProductCard({
 
                 <div className="grid grid-cols-2 gap-2">
                   <label className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Data
                     </span>
                     <input
@@ -486,7 +504,7 @@ export function ProductCard({
                     />
                   </label>
                   <label className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Horário
                     </span>
                     <input
@@ -499,7 +517,7 @@ export function ProductCard({
                 </div>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Quantidade {product.unitLabel ? `(${product.unitLabel.replace("/ ", "")})` : ""}
                   </span>
                   <input
@@ -528,7 +546,7 @@ export function ProductCard({
                   </p>
                 )}
 
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                <p className="text-xs leading-relaxed text-muted-foreground">
                   💡 Recomendamos agendar com pelo menos {minNotice}h de antecedência pra
                   garantir vaga na agenda.
                 </p>

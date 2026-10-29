@@ -1,13 +1,16 @@
+import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useDialogA11y } from "@/lib/use-dialog";
 import { useOrder } from "@/contexts/order-context";
 import { maskPhone } from "@/lib/format";
 
 export function CustomerCaptureModal() {
-  const { customerPromptOpen, confirmCustomer } = useOrder();
+  const { customerPromptOpen, confirmCustomer, cancelCustomerPrompt } = useOrder();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const nameRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useDialogA11y<HTMLDivElement>(customerPromptOpen, cancelCustomerPrompt);
 
   useEffect(() => {
     if (customerPromptOpen) {
@@ -46,7 +49,7 @@ export function CustomerCaptureModal() {
 
   const errStyle = (has?: string): React.CSSProperties => ({
     ...inputBase,
-    border: `1.5px solid ${has ? "#e63946" : "#e8ddd0"}`,
+    border: `1.5px solid ${has ? "#c1121f" : "#ae8296"}`,
   });
 
   return (
@@ -55,8 +58,6 @@ export function CustomerCaptureModal() {
         position: "fixed",
         inset: 0,
         background: "rgba(0,0,0,0.6)",
-        backdropFilter: "blur(4px)",
-        WebkitBackdropFilter: "blur(4px)",
         zIndex: 9999,
         display: "flex",
         alignItems: "center",
@@ -67,6 +68,7 @@ export function CustomerCaptureModal() {
       role="dialog"
       aria-modal="true"
       aria-labelledby="tonton-capture-title"
+      ref={dialogRef}
     >
       <style>{`
         @keyframes tonton-fade {
@@ -92,12 +94,35 @@ export function CustomerCaptureModal() {
           background: "#fff",
           borderRadius: 24,
           padding: "36px 32px",
+          position: "relative",
           maxWidth: 400,
           width: "90%",
           boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
           animation: "tonton-pop 250ms ease-out",
         }}
       >
+        <button
+          type="button"
+          onClick={cancelCustomerPrompt}
+          aria-label="Fechar"
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            width: 44,
+            height: 44,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 22,
+            border: "none",
+            background: "transparent",
+            color: "#6b6b6b",
+            cursor: "pointer",
+          }}
+        >
+          <X size={20} />
+        </button>
         <div style={{ fontSize: "2.5rem", textAlign: "center", marginBottom: 8 }}>
           🍫
         </div>
@@ -142,6 +167,7 @@ export function CustomerCaptureModal() {
         </label>
         <input
           ref={nameRef}
+          data-autofocus
           id="tonton-name"
           className="tonton-capture-input"
           type="text"
@@ -151,13 +177,17 @@ export function CustomerCaptureModal() {
           style={errStyle(errors.name)}
           autoComplete="name"
           maxLength={80}
+          aria-invalid={!!errors.name}
+          aria-describedby={errors.name ? "tonton-name-err" : undefined}
         />
         {errors.name && (
           <p
+            id="tonton-name-err"
+            role="alert"
             style={{
               fontFamily: "Inter, sans-serif",
               fontSize: 12,
-              color: "#e63946",
+              color: "#c1121f",
               marginTop: 4,
             }}
           >
@@ -188,14 +218,18 @@ export function CustomerCaptureModal() {
           value={phone}
           onChange={(e) => setPhone(maskPhone(e.target.value))}
           style={errStyle(errors.phone)}
-          autoComplete="tel"
+          autoComplete="tel-national"
+          aria-invalid={!!errors.phone}
+          aria-describedby={errors.phone ? "tonton-phone-err" : undefined}
         />
         {errors.phone && (
           <p
+            id="tonton-phone-err"
+            role="alert"
             style={{
               fontFamily: "Inter, sans-serif",
               fontSize: 12,
-              color: "#e63946",
+              color: "#c1121f",
               marginTop: 4,
             }}
           >
@@ -226,8 +260,8 @@ export function CustomerCaptureModal() {
         <p
           style={{
             fontFamily: "Inter, sans-serif",
-            fontSize: 11,
-            color: "#aaa",
+            fontSize: 12,
+            color: "#6b6b6b",
             textAlign: "center",
             marginTop: 12,
             marginBottom: 0,
