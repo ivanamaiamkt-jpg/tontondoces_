@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { syncAbandonedCart } from "@/lib/abandoned-cart";
 import { computePairDiscount } from "@/lib/pair-promo";
@@ -52,8 +53,6 @@ type OrderContextValue = {
   customer: Customer | null;
   customerPromptOpen: boolean;
   confirmCustomer: (c: Customer) => void;
-  /** Fecha a janela de nome/WhatsApp sem cadastrar (o item que a cliente tocou não é adicionado). */
-  cancelCustomerPrompt: () => void;
   /** If customer not set yet, opens modal and runs `then` after confirm. Returns true if action ran immediately. */
   ensureCustomer: (then: () => void) => boolean;
 };
@@ -178,12 +177,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     if (action) action();
   };
 
-  const cancelCustomerPrompt = () => {
-    pendingItemRef.current = null;
-    pendingActionRef.current = null;
-    setCustomerPromptOpen(false);
-  };
-
   const ensureCustomer: OrderContextValue["ensureCustomer"] = (then) => {
     if (customerRef.current) {
       then();
@@ -202,8 +195,26 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const removeItem = (lineId: string) =>
+  const removeItem = (lineId: string) => {
+    const index = items.findIndex((it) => it.lineId === lineId);
+    if (index < 0) return;
+    const removed = items[index];
     setItems((prev) => prev.filter((it) => it.lineId !== lineId));
+    // Tocou sem querer? "Desfazer" devolve a linha no mesmo lugar.
+    toast("Item removido", {
+      duration: 6000,
+      action: {
+        label: "Desfazer",
+        onClick: () =>
+          setItems((prev) => {
+            if (prev.some((it) => it.lineId === removed.lineId)) return prev;
+            const next = [...prev];
+            next.splice(Math.min(index, next.length), 0, removed);
+            return next;
+          }),
+      },
+    });
+  };
 
   const clearCart = () => setItems([]);
 
@@ -232,7 +243,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         customer,
         customerPromptOpen,
         confirmCustomer,
-        cancelCustomerPrompt,
         ensureCustomer,
       }}
     >

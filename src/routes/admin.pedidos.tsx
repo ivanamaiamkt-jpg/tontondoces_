@@ -121,7 +121,7 @@ function buildReadyMsg(o: Order) {
   const isDelivery = o.delivery_mode === "delivery";
   const pay =
     o.payment_method === "pix"
-      ? `\n\nChave PIX: ${PIX_KEY}\nValor: ${brl(Number(o.total))}`
+      ? `\n\nChave PIX: ${PIX_KEY} (aparece no banco como Izana Maia)\nValor: ${brl(Number(o.total))}`
       : o.payment_method === "link"
         ? ""
         : isDelivery

@@ -57,7 +57,7 @@ type QuoteState =
   | { kind: "done"; quote: DeliveryQuote }
   | { kind: "error" };
 
-const STEP_LABELS = ["Quem é você?", "Como você quer receber?", "Confirmar pedido"];
+const STEP_LABELS = ["Quem é você?", "Como você quer receber?", "Revise seu pedido"];
 
 const RECEIVING_WHATSAPP: Record<Receiving, string> = {
   pickup: "Retirada na loja",
@@ -408,6 +408,19 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     setCartOpen(false);
   };
 
+  // O X: antes de mandar pelo WhatsApp o pedido já está salvo, mas a loja ainda não sabe que a
+  // pessoa quer mesmo; por isso pergunta antes de fechar.
+  const closeCheckout = () => {
+    if (!confirmed) {
+      onClose();
+      return;
+    }
+    if (!sent && !window.confirm("Você ainda não enviou o pedido pelo WhatsApp. Sair mesmo assim?")) {
+      return;
+    }
+    finishAndClose();
+  };
+
   const goNext = () => {
     if (step === 1 && step1Valid) setStep(2);
     else if (step === 2 && step2Valid) setStep(3);
@@ -440,11 +453,11 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
               </button>
             )}
             <h2 id={`${uid}-title`} className="font-display text-xl">
-              {confirmed ? (sent ? "Pedido enviado!" : "Estamos quase lá 💜") : STEP_LABELS[step - 1]}
+              {confirmed ? "Estamos quase lá 💜" : STEP_LABELS[step - 1]}
             </h2>
           </div>
           <button
-            onClick={confirmed ? finishAndClose : onClose}
+            onClick={closeCheckout}
             className="rounded-full p-2.5 hover:bg-primary-glow"
             aria-label="Fechar"
           >
@@ -473,11 +486,15 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
               <Check className="h-8 w-8 text-primary" />
             </div>
             <h3 className="mt-4 font-display text-2xl text-foreground">
-              {sent ? "Pedido enviado! ✓" : "Estamos quase lá 💜"}
+              {sent ? "WhatsApp aberto 💜" : `Pedido #${confirmed.orderId} registrado!`}
             </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Pedido <strong>#{confirmed.orderId}</strong> — total{" "}
-              <strong>{brl(confirmed.total)}</strong>
+            <p className="mt-2 text-base text-foreground">
+              {sent
+                ? "Se você já tocou em enviar, é só voltar aqui."
+                : "Falta só enviar pelo WhatsApp pra gente confirmar com você."}
+            </p>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Total <strong>{brl(confirmed.total)}</strong>
               <br />
               Forma de pagamento:{" "}
               <strong>
@@ -507,6 +524,9 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                     <Copy className="h-3.5 w-3.5" /> Copiar
                   </button>
                 </div>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  Ao pagar, o nome que aparece no seu banco é Izana Maia (MEI da TonTon Doces) 💕
+                </p>
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                   Após pagar, envie o comprovante junto com o pedido pelo WhatsApp 💕
                 </p>
@@ -580,9 +600,6 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                   <MessageCircle className="mr-2 h-5 w-5" />
                   📲 Enviar pedido pelo WhatsApp
                 </Button>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  Seu pedido só será confirmado após o envio pelo WhatsApp.
-                </p>
               </>
             ) : (
               <>
@@ -889,7 +906,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                       >
                         <div className="font-semibold text-foreground">💸 PIX</div>
                         <div className="text-xs text-muted-foreground">
-                          Chave enviada após confirmação do pedido
+                          A chave aparece na próxima tela
                         </div>
                       </button>
                       {allowedPayments.includes("maquininha") && (
@@ -1024,7 +1041,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                     size="lg"
                     className="w-full bg-primary text-primary-foreground hover:bg-primary-glow"
                   >
-                    {submitting ? "Confirmando..." : "Confirmar pedido"}
+                    {submitting ? "Finalizando..." : "Finalizar pedido"}
                   </Button>
                 </>
               )}

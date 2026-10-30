@@ -9,6 +9,7 @@ import { SuggestionCarousel, SuggestionFlavorSheet } from "./suggestion-carousel
 import { useGiftMin } from "@/lib/gift";
 import { useCartSuggestions } from "@/lib/cart-suggestions";
 import { useMinOrder } from "@/lib/min-order";
+import { useDeliverySettings } from "@/lib/delivery";
 import { PAIR_PROMO_LABEL } from "@/lib/pair-promo";
 import { toast } from "sonner";
 import { trackPixel } from "@/lib/fbq";
@@ -50,6 +51,7 @@ export function CartDrawer() {
   const [pickingId, setPickingId] = useState<string | null>(null);
   const picking = suggestions.find((x) => x.id === pickingId) ?? null;
   const giftMin = useGiftMin();
+  const delivery = useDeliverySettings();
   // Esc fecha o carrinho (com o checkout aberto por cima, o Esc é do checkout).
   const dialogRef = useDialogA11y<HTMLElement>(cartOpen, () => setCartOpen(false));
 
@@ -250,6 +252,11 @@ export function CartDrawer() {
                     </div>
                   )}
                 </dl>
+                {delivery.enabled && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    A taxa de entrega é calculada no próximo passo ({brl(delivery.feePerKm)} por km)
+                  </p>
+                )}
               </div>
 
               {subtotal < MIN_ORDER && (

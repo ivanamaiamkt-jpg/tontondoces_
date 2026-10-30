@@ -1,16 +1,16 @@
-import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDialogA11y } from "@/lib/use-dialog";
 import { useOrder } from "@/contexts/order-context";
 import { maskPhone } from "@/lib/format";
 
 export function CustomerCaptureModal() {
-  const { customerPromptOpen, confirmCustomer, cancelCustomerPrompt } = useOrder();
+  const { customerPromptOpen, confirmCustomer } = useOrder();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const nameRef = useRef<HTMLInputElement>(null);
-  const dialogRef = useDialogA11y<HTMLDivElement>(customerPromptOpen, cancelCustomerPrompt);
+  // Cadastro obrigatório (sem X nem Esc): é ele que guarda o carrinho pra loja poder chamar a pessoa.
+  const dialogRef = useDialogA11y<HTMLDivElement>(customerPromptOpen);
 
   useEffect(() => {
     if (customerPromptOpen) {
@@ -101,28 +101,6 @@ export function CustomerCaptureModal() {
           animation: "tonton-pop 250ms ease-out",
         }}
       >
-        <button
-          type="button"
-          onClick={cancelCustomerPrompt}
-          aria-label="Fechar"
-          style={{
-            position: "absolute",
-            top: 8,
-            right: 8,
-            width: 44,
-            height: 44,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 22,
-            border: "none",
-            background: "transparent",
-            color: "#6b6b6b",
-            cursor: "pointer",
-          }}
-        >
-          <X size={20} />
-        </button>
         <div style={{ fontSize: "2.5rem", textAlign: "center", marginBottom: 8 }}>
           🍫
         </div>
@@ -149,7 +127,7 @@ export function CustomerCaptureModal() {
             marginBottom: 24,
           }}
         >
-          Preenche rapidinho pra gente guardar seu pedido com carinho 💕
+          Pra avisar você quando seu pedido ficar pronto 💕
         </p>
 
         <label

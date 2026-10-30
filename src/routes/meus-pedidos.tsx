@@ -47,7 +47,7 @@ type OrderRow = {
 };
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
-  novo: { label: "Novo", cls: "bg-blue-100 text-blue-800" },
+  novo: { label: "Recebido", cls: "bg-blue-100 text-blue-800" },
   em_producao: { label: "Em produção", cls: "bg-amber-100 text-amber-800" },
   pronto: { label: "Pronto", cls: "bg-green-100 text-green-800" },
   aguardando_entrega: { label: "Pronto", cls: "bg-green-100 text-green-800" },

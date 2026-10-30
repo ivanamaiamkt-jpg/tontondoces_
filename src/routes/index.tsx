@@ -6,6 +6,7 @@ import { getAvailabilityState } from "@/lib/product-availability";
 import { getMergedCategories } from "@/lib/menu-overrides";
 import { useMinOrder } from "@/lib/min-order";
 import { useDeliverySettings } from "@/lib/delivery";
+import { useGiftMin } from "@/lib/gift";
 import { brl } from "@/lib/format";
 import { CategoryBanner } from "@/components/tonton/category-banner";
 import { ProductCard } from "@/components/tonton/product-card";
@@ -55,6 +56,7 @@ function HomePage() {
   const { cartOpen, items } = useOrder();
   const minOrder = useMinOrder();
   const delivery = useDeliverySettings();
+  const giftMin = useGiftMin();
   const initial = Route.useLoaderData();
   const [soldOut, setSoldOut] = useState<Set<string>>(() => new Set(initial.soldOut));
   const [archived, setArchived] = useState<Set<string>>(() => new Set(initial.archived));
@@ -96,7 +98,9 @@ function HomePage() {
             className="hero-tonton-logo"
           />
           <h1 className="hero-tonton-title">
-            Brigadeiros absurdamente cremosos, prontinhos pra você buscar
+            {delivery.enabled
+              ? "Brigadeiros absurdamente cremosos, na sua porta ou prontinhos pra você buscar"
+              : "Brigadeiros absurdamente cremosos, prontinhos pra você buscar"}
           </h1>
           <p className="hero-tonton-sub">
             {delivery.enabled
@@ -164,6 +168,15 @@ function HomePage() {
           </a>
           <span aria-hidden>·</span>
           <span>🛒 Pedido mínimo: {brl(minOrder)}</span>
+          {giftMin > 0 && (
+            <>
+              <span aria-hidden>·</span>
+              <span>
+                Pedidos a partir de {Number.isInteger(giftMin) ? `R$ ${giftMin}` : brl(giftMin)} ganham
+                um brinde 🎁
+              </span>
+            </>
+          )}
           <span aria-hidden>·</span>
           <Link
             to="/meus-pedidos"
