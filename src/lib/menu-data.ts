@@ -152,7 +152,7 @@ export const BOMBOM_FLAVORS: Flavor[] = [
   },
 ];
 
-/* Copos em promoção: Dupla Tentação e Oreo só existem no de 150 ml; o Ferreiro existe nos dois tamanhos. */
+/* Copos em promoção: Dupla Tentação e Oreo só existem no de 150g; o Ferreiro existe nos dois tamanhos. */
 const PROMO_DUPLA_TENTACAO: Flavor = {
   id: "dupla-tentacao",
   name: "Dupla Tentação",
@@ -247,7 +247,7 @@ export const CATEGORIES: Category[] = [
             "Morangos fresquinhos no espetinho, cobertos com chocolate branco e cravejados com pedacinhos de morango.",
         },
       ),
-      p("promo-copo-150", "Copo 150 ml", 12.99, imgDuplaTentacao, {
+      p("promo-copo-150", "Copo 150g", 11.99, imgDuplaTentacao, {
         description: "Escolha o seu sabor.",
         originalPrice: 16,
         badge: "Promoção",
@@ -353,13 +353,13 @@ export const CATEGORIES: Category[] = [
     products: [
       p("copo-doce-encanto", "Doce Encanto — Brigadeiro, Ninho, Uva", 25, imgDoceEncanto, {
         description:
-          "280g de pura felicidade: brownie na base, brigadeiro cremoso, mousse de Ninho e uvas que estouram na boca.",
+          "250g de pura felicidade: brownie na base, brigadeiro cremoso, mousse de Ninho e uvas que estouram na boca.",
         originalPrice: 28.9,
         badge: "⭐ Mais Vendido · Promoção",
       }),
       p("copo-nevadinho", "Nevadinho — Mousse de Ninho", 25, imgNevadinho, {
         description:
-          "280g com brownie na base e mousse de Ninho aveludada.",
+          "250g com brownie na base e mousse de Ninho aveludada.",
         originalPrice: 28.9,
         badge: "Promoção",
       }),
@@ -370,7 +370,7 @@ export const CATEGORIES: Category[] = [
         imgNevadinho2,
         {
           description:
-            "280g com brownie na base, brigadeiro e mousse de Ninho em camadas que se fundem na colher. Pecado assumido, sem arrependimento.",
+            "250g com brownie na base, brigadeiro e mousse de Ninho em camadas que se fundem na colher. Pecado assumido, sem arrependimento.",
           originalPrice: 28.9,
           badge: "Promoção",
         },
@@ -382,14 +382,14 @@ export const CATEGORIES: Category[] = [
         imgPrazerCamadas,
         {
           description:
-            "280g com brownie na base e brigadeiro no ponto perfeito. Chocolate puro, sem enrolação.",
+            "250g com brownie na base e brigadeiro no ponto perfeito. Chocolate puro, sem enrolação.",
           originalPrice: 28.9,
           badge: "Promoção",
         },
       ),
       p("copo-merengue", "Copo Merengue", 25, imgCopoMerengue, {
         description:
-          "280g de creme branco sedoso, brigadeiro cremoso, morangos fresquinhos. Texturas que vão te surpreender.",
+          "250g de creme branco sedoso, brigadeiro cremoso, morangos fresquinhos. Texturas que vão te surpreender.",
         originalPrice: 28.9,
         badge: "Promoção",
       }),
@@ -400,7 +400,7 @@ export const CATEGORIES: Category[] = [
         imgCopoConforto,
         {
           description:
-            "280g com brownie na base, brigadeiro, mousse de Ninho e morangos suculentos em camadas. O combo que virou vício.",
+            "250g com brownie na base, brigadeiro, mousse de Ninho e morangos suculentos em camadas. O combo que virou vício.",
           originalPrice: 28.9,
           badge: "Promoção",
         },
