@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { syncAbandonedCart } from "@/lib/abandoned-cart";
+import { trackPixel } from "@/lib/fbq";
 import { computePairDiscount } from "@/lib/pair-promo";
 
 export type CartItem = {
@@ -146,6 +147,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       // ignore
     }
     setCustomerPromptOpen(false);
+    // Contato deixado: sinal pro Meta (Lead), bem mais frequente que a compra.
+    trackPixel("Lead");
 
     // Upsert no banco em background — pega/atribui id
     try {

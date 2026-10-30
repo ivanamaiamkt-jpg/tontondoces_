@@ -62,9 +62,10 @@ export const Route = createRootRoute({
     ],
     scripts: [
       {
-        // Pixel e Clarity: a fila de eventos fica pronta já, mas os scripts só baixam depois da
-        // página carregar (não disputam banda com as fotos) e não rodam no painel nem no link do motoboy.
-        children: `!function(){if(/^\\/(admin|entrega)/.test(location.pathname))return;var f=window,b=document;if(!f.fbq){var n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[]}fbq('init','902455499492362');fbq('track','PageView');fbq('track','ViewContent');f.clarity=f.clarity||function(){(f.clarity.q=f.clarity.q||[]).push(arguments)};var load=function(){var s=b.getElementsByTagName('script')[0],t=b.createElement('script');t.async=!0;t.src='https://connect.facebook.net/en_US/fbevents.js';s.parentNode.insertBefore(t,s);var c=b.createElement('script');c.async=!0;c.src='https://www.clarity.ms/tag/wngepph1g8';s.parentNode.insertBefore(c,s)};var later=function(){(f.requestIdleCallback||function(fn){setTimeout(fn,1500)})(load)};b.readyState==='complete'?later():f.addEventListener('load',later)}();`,
+        // Pixel do Meta: baixa já (assíncrono), pra contar também quem sai antes da página terminar de
+        // carregar. Clarity espera a página carregar. Nada roda no painel, no link do motoboy nem no
+        // computador de quem está testando (localhost), pra não sujar os dados dos anúncios.
+        children: `!function(){var f=window,b=document,h=location.hostname;if(/^\\/(admin|entrega)/.test(location.pathname)||h==='localhost'||h==='127.0.0.1'||h==='[::1]'||/\\.localhost$/.test(h))return;if(!f.fbq){var n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[]}fbq('init','902455499492362');fbq('track','PageView');fbq('track','ViewContent');var s=b.getElementsByTagName('script')[0],t=b.createElement('script');t.async=!0;t.src='https://connect.facebook.net/en_US/fbevents.js';s.parentNode.insertBefore(t,s);f.clarity=f.clarity||function(){(f.clarity.q=f.clarity.q||[]).push(arguments)};var load=function(){var c=b.createElement('script');c.async=!0;c.src='https://www.clarity.ms/tag/wngepph1g8';s.parentNode.insertBefore(c,s)};var later=function(){(f.requestIdleCallback||function(fn){setTimeout(fn,1500)})(load)};b.readyState==='complete'?later():f.addEventListener('load',later)}();`,
       },
     ],
   }),

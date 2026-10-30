@@ -102,12 +102,6 @@ function HomePage() {
               ? "Brigadeiros absurdamente cremosos, na sua porta ou prontinhos pra você buscar"
               : "Brigadeiros absurdamente cremosos, prontinhos pra você buscar"}
           </h1>
-          <p className="hero-tonton-sub">
-            {delivery.enabled
-              ? `📍 Entrega em até ${delivery.maxKm} km (em média ${delivery.etaMin} min) ou retirada na Vila Mineirão`
-              : "📍 Retirada na Vila Mineirão, Sorocaba"}
-          </p>
-
         </div>
         <div className="hero-tonton-right">
           <img

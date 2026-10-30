@@ -30,18 +30,10 @@ export function CartDrawer() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const initiatedRef = useRef(false);
 
+  // InitiateCheckout sai uma vez só, quando toca em "Finalizar pedido"; carrinho vazio zera a trava.
   useEffect(() => {
-    if (cartOpen && items.length > 0 && !initiatedRef.current) {
-      initiatedRef.current = true;
-      trackPixel("InitiateCheckout", {
-        value: subtotal,
-        currency: "BRL",
-        num_items: items.reduce((s, it) => s + it.quantity, 0),
-        contents: items.map((it) => ({ id: it.productId, quantity: it.quantity })),
-        content_type: "product",
-      });
-    }
-  }, [cartOpen, items, subtotal]);
+    if (items.length === 0) initiatedRef.current = false;
+  }, [items.length]);
 
   // Sugestões do dia (rodízio configurado em Admin > Configurações). "via" marca no pedido
   // que o item veio da sugestão, pra ela medir o que vende.
@@ -296,13 +288,16 @@ export function CartDrawer() {
               disabled={subtotal < MIN_ORDER}
               className="w-full justify-between bg-primary text-base font-semibold text-primary-foreground shadow-lg hover:bg-primary-glow"
               onClick={() => {
-                trackPixel("InitiateCheckout", {
-                  value: total,
-                  currency: "BRL",
-                  num_items: items.reduce((s, it) => s + it.quantity, 0),
-                  contents: items.map((it) => ({ id: it.productId, quantity: it.quantity })),
-                  content_type: "product",
-                });
+                if (!initiatedRef.current) {
+                  initiatedRef.current = true;
+                  trackPixel("InitiateCheckout", {
+                    value: total,
+                    currency: "BRL",
+                    num_items: items.reduce((s, it) => s + it.quantity, 0),
+                    contents: items.map((it) => ({ id: it.productId, quantity: it.quantity })),
+                    content_type: "product",
+                  });
+                }
                 setCheckoutOpen(true);
               }}
             >
