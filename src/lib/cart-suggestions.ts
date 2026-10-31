@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, type Product } from "@/lib/menu-data";
-import { getAvailabilityState } from "@/lib/product-availability";
+import { getAvailabilityState, optionKey } from "@/lib/product-availability";
 
 export type SuggestionMode = "rodizio" | "fixo";
 
@@ -45,7 +45,18 @@ export function pickSuggestions(opts: {
   unavailable: Set<string>;
   now?: Date;
 }): Product[] {
-  const byId = new Map(allSuggestibleProducts().map((p) => [p.id, p]));
+  // Opção esgotada some da escolha; sem nenhuma opção livre o produto não é sugerido.
+  const withOpenOptions = (p: Product): Product | null => {
+    if (!p.flavors) return p;
+    const open = p.flavors.filter((f) => !opts.unavailable.has(optionKey(p.id, f.id)));
+    if (open.length === 0) return null;
+    return open.length === p.flavors.length ? p : { ...p, flavors: open };
+  };
+  const byId = new Map(
+    allSuggestibleProducts()
+      .map((p) => [p.id, withOpenOptions(p)] as const)
+      .filter((e): e is readonly [string, Product] => e[1] !== null),
+  );
   const valid = opts.pool.map((id) => byId.get(id)).filter((p): p is Product => !!p);
   const free = (p: Product) => !opts.cartProductIds.includes(p.id) && !opts.unavailable.has(p.id);
   // O rodízio gira sobre a lista toda (e não só sobre o que sobrou), assim as sugestões não

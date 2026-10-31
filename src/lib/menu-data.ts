@@ -440,6 +440,7 @@ export const CATEGORIES: Category[] = [
           { id: "brig-4-especiais", name: "4 un. — Especiais", description: "Caixa com 4 brigadeiros especiais da casa.", price: 15.0 },
           { id: "brig-4-beijinho", name: "4 un. — Beijinho", description: "Caixa com 4 beijinhos cremosos.", price: 15.0 },
           { id: "brig-10", name: "10 un. — Sortidos", description: "Caixa com 10 brigadeiros sortidos.", price: 27.0 },
+          { id: "brig-15", name: "15 un. — Sortidos", description: "Caixa com 15 brigadeiros sortidos.", price: 37.5 },
         ],
       }),
       p("art-camafeu", "Camafeu de Morango", 14.8, imgCamafeu, {

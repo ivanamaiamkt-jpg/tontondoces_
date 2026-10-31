@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Heart, Instagram, MessageCircle } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { CATEGORIES, type Category } from "@/lib/menu-data";
-import { getAvailabilityState } from "@/lib/product-availability";
+import { getAvailabilityState, soldOutOptionsByProduct } from "@/lib/product-availability";
 import { getMergedCategories } from "@/lib/menu-overrides";
 import { useMinOrder } from "@/lib/min-order";
 import { useDeliverySettings } from "@/lib/delivery";
@@ -71,6 +71,8 @@ function HomePage() {
     });
     getMergedCategories().then(setMerged);
   }, []);
+
+  const optionsOut = useMemo(() => soldOutOptionsByProduct(soldOut), [soldOut]);
 
   const categories = useMemo(
     () =>
@@ -200,7 +202,12 @@ function HomePage() {
                 antes elas montavam ao rolar e a página dava um salto. */}
             <div className="space-y-3">
               {cat.products.map((p) => (
-                <ProductCard key={p.id} product={p} soldOut={soldOut.has(p.id)} />
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  soldOut={soldOut.has(p.id)}
+                  soldOutOptions={optionsOut.get(p.id)}
+                />
               ))}
             </div>
           </section>

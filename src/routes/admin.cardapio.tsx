@@ -1,8 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { CATEGORIES } from "@/lib/menu-data";
+import {
+  BOMBOM_FLAVORS,
+  CATEGORIES,
+  COPO_FLAVORS,
+  type Flavor,
+  type Product,
+} from "@/lib/menu-data";
 import {
   getAvailabilityState,
+  optionKey,
   setProductAvailability,
   setProductArchived,
 } from "@/lib/product-availability";
@@ -39,6 +46,15 @@ export const Route = createFileRoute("/admin/cardapio")({
   component: CardapioAdminPage,
 });
 
+/** Opções que o cliente escolhe dentro do produto: tamanhos, sabores ou os sabores dos combos. */
+function optionsOf(p: Product): Flavor[] {
+  const pools = (p.flavorPicks ?? []).map((pick) =>
+    pick.from === "copo" ? COPO_FLAVORS : BOMBOM_FLAVORS,
+  );
+  const seen = new Set<string>();
+  return [...(p.flavors ?? []), ...pools.flat()].filter((f) => !seen.has(f.id) && seen.add(f.id));
+}
+
 type ProductDraft = { name: string; description: string; price: string; image_url: string };
 
 const emptyDraft: ProductDraft = { name: "", description: "", price: "", image_url: "" };
@@ -52,6 +68,7 @@ function CardapioAdminPage() {
   const [customProducts, setCustomProducts] = useState<CustomProductRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState<string | null>(null);
+  const [openOptions, setOpenOptions] = useState<Set<string>>(new Set());
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ProductDraft>(emptyDraft);
@@ -89,6 +106,14 @@ function CardapioAdminPage() {
     load();
   }, []);
 
+  const toggleOptionsOpen = (productId: string) =>
+    setOpenOptions((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(productId)) next.add(productId);
+      return next;
+    });
+
+  /** Serve pro produto inteiro (id do produto) e pra uma opção dele (chave "produto::opção"). */
   const toggleEsgotado = async (productId: string, currentlySoldOut: boolean) => {
     setPending(productId);
     const { error } = await setProductAvailability(productId, currentlySoldOut);
@@ -418,11 +443,18 @@ function CardapioAdminPage() {
                     const isSoldOut = soldOut.has(p.id);
                     const ov = overrides.get(p.id);
                     const isEditing = editingId === p.id;
+                    const options = optionsOf(p);
+                    const optionsOpen = openOptions.has(p.id);
+                    const optionsOutCount = options.filter((o) =>
+                      soldOut.has(optionKey(p.id, o.id)),
+                    ).length;
                     return (
                       <li key={p.id} className="py-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className={`min-w-0 flex-1 ${isSoldOut ? "opacity-50" : ""}`}>
-                            <p className="truncate font-medium text-foreground">
+                        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                          <div
+                            className={`min-w-0 basis-full sm:flex-1 sm:basis-0 ${isSoldOut ? "opacity-50" : ""}`}
+                          >
+                            <p className="font-medium text-foreground sm:truncate">
                               {ov?.name ?? p.name}
                               {isSoldOut && (
                                 <span className="ml-2 text-xs font-semibold uppercase text-destructive">
@@ -435,7 +467,7 @@ function CardapioAdminPage() {
                                 </span>
                               )}
                             </p>
-                            <p className="truncate text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground sm:truncate">
                               {ov?.description ?? p.description}
                             </p>
                           </div>
@@ -473,6 +505,68 @@ function CardapioAdminPage() {
                             <Archive className="h-4 w-4" /> Arquivar
                           </button>
                         </div>
+
+                        {options.length > 0 && (
+                          <div className="mt-2">
+                            <button
+                              onClick={() => toggleOptionsOpen(p.id)}
+                              aria-expanded={optionsOpen}
+                              className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                            >
+                              {optionsOpen ? "Esconder opções" : `Opções (${options.length})`}
+                              {optionsOutCount > 0 && (
+                                <span className="font-semibold text-destructive">
+                                  · {optionsOutCount} esgotada{optionsOutCount > 1 ? "s" : ""}
+                                </span>
+                              )}
+                            </button>
+                            {optionsOpen && (
+                              <ul className="mt-2 divide-y divide-border rounded-xl border border-border bg-muted/20">
+                                {options.map((o) => {
+                                  const key = optionKey(p.id, o.id);
+                                  const out = soldOut.has(key);
+                                  return (
+                                    <li
+                                      key={o.id}
+                                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2"
+                                    >
+                                      <p
+                                        className={`min-w-[9rem] flex-1 text-sm ${out ? "opacity-50" : ""}`}
+                                      >
+                                        {o.name}
+                                        {out && (
+                                          <span className="ml-2 text-xs font-semibold uppercase text-destructive">
+                                            Esgotado
+                                          </span>
+                                        )}
+                                      </p>
+                                      {!p.id.startsWith("combo-") && typeof o.price === "number" && (
+                                        <p className="shrink-0 text-sm text-muted-foreground">
+                                          {brl(o.price)}
+                                        </p>
+                                      )}
+                                      <button
+                                        onClick={() => toggleEsgotado(key, out)}
+                                        disabled={pending === key}
+                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-60"
+                                      >
+                                        {out ? (
+                                          <>
+                                            <Eye className="h-4 w-4" /> Disponível
+                                          </>
+                                        ) : (
+                                          <>
+                                            <EyeOff className="h-4 w-4" /> Esgotado
+                                          </>
+                                        )}
+                                      </button>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </div>
+                        )}
 
                         {isEditing && (
                           <div className="mt-3 space-y-2 rounded-xl bg-muted/30 p-3">

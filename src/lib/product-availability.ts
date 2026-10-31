@@ -25,6 +25,23 @@ export async function getAvailabilityState(): Promise<AvailabilityState | null> 
   };
 }
 
+/** Opção de um produto (tamanho ou sabor) esgotada: mesma tabela, com a chave "produto::opção". */
+export const optionKey = (productId: string, optionId: string) => `${productId}::${optionId}`;
+
+/** Ids das opções esgotadas de cada produto (a partir das chaves "produto::opção"). */
+export function soldOutOptionsByProduct(soldOut: Set<string>): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+  for (const key of soldOut) {
+    const i = key.indexOf("::");
+    if (i < 0) continue;
+    const productId = key.slice(0, i);
+    const set = map.get(productId) ?? new Set<string>();
+    set.add(key.slice(i + 2));
+    map.set(productId, set);
+  }
+  return map;
+}
+
 export async function setProductAvailability(productId: string, isAvailable: boolean) {
   return supabase.from("product_availability" as never).upsert(
     { product_id: productId, is_available: isAvailable } as never,

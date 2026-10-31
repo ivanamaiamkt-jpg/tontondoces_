@@ -19,26 +19,33 @@ function FlavorPicker({
   onChange,
   name,
   hidePrice,
+  soldOut,
 }: {
   flavors: Flavor[];
   value: string | null;
   onChange: (id: string) => void;
   name: string;
   hidePrice?: boolean;
+  /** Ids das opções esgotadas: aparecem apagadas e não dá pra escolher. */
+  soldOut?: Set<string>;
 }) {
   return (
     <div className="space-y-2" role="group" aria-label={`Sabor — ${name}`}>
       {flavors.map((f) => {
-        const selected = value === f.id;
+        const out = !!soldOut?.has(f.id);
+        const selected = !out && value === f.id;
         return (
           <button
             key={f.id}
             type="button"
+            disabled={out}
             onClick={() => onChange(f.id)}
             className={`w-full rounded-xl border-2 p-3 text-left transition ${
-              selected
-                ? "border-primary bg-primary/5"
-                : "border-border bg-card hover:border-primary/40"
+              out
+                ? "cursor-not-allowed border-border bg-muted/40 opacity-60"
+                : selected
+                  ? "border-primary bg-primary/5"
+                  : "border-border bg-card hover:border-primary/40"
             }`}
           >
             <div className="flex items-start gap-3">
@@ -59,11 +66,18 @@ function FlavorPicker({
                 {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground">{f.name}</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {f.name}
+                  {out && (
+                    <span className="ml-2 text-xs font-bold uppercase tracking-wider text-destructive">
+                      Esgotado
+                    </span>
+                  )}
+                </p>
                 <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                   {f.description}
                 </p>
-                {!hidePrice && typeof f.price === "number" && (
+                {!hidePrice && !out && typeof f.price === "number" && (
                   <p className="mt-1 text-xs font-bold text-primary">
                     R$ {f.price.toFixed(2).replace(".", ",")}
                   </p>
@@ -98,10 +112,13 @@ function formatEventLabel(date: string, time: string) {
 
 export function ProductCard({
   product,
-  soldOut = false,
+  soldOut: productSoldOut = false,
+  soldOutOptions,
 }: {
   product: Product;
   soldOut?: boolean;
+  /** Ids das opções (tamanhos/sabores) esgotadas deste produto. */
+  soldOutOptions?: Set<string>;
 }) {
   const { addItem, ensureCustomer, setCartOpen } = useOrder();
   const [open, setOpen] = useState(false);
@@ -112,7 +129,12 @@ export function ProductCard({
   const [eventTime, setEventTime] = useState("");
   const [qty, setQty] = useState(product.minQuantity ?? 1);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const price = priceFrom(product);
+  const price = priceFrom(product, soldOutOptions);
+
+  // Sem nenhuma opção disponível, o produto todo aparece como esgotado.
+  const soldOut =
+    productSoldOut ||
+    (!!product.flavors?.length && product.flavors.every((f) => soldOutOptions?.has(f.id)));
 
   const needsFlavor = !!product.flavors;
   const needsPicks = !!product.flavorPicks;
@@ -431,6 +453,7 @@ export function ProductCard({
                   onChange={handleFlavorSelect}
                   name={product.name}
                   hidePrice={product.id.startsWith("combo-")}
+                  soldOut={soldOutOptions}
                 />
               </div>
             )}
@@ -445,17 +468,21 @@ export function ProductCard({
                   </p>
                   <div className="space-y-2">
                     {pool.map((f) => {
-                      const selected = cur.includes(f.id);
+                      const out = !!soldOutOptions?.has(f.id);
+                      const selected = !out && cur.includes(f.id);
                       return (
                         <button
                           key={f.id}
                           type="button"
+                          disabled={out}
                           aria-pressed={selected}
                           onClick={() => handlePickToggle(current.bucket, f.id, current.count)}
                           className={`flex w-full items-start gap-3 rounded-xl border-2 p-3 text-left transition ${
-                            selected
-                              ? "border-primary bg-primary/5"
-                              : "border-border bg-card hover:border-primary/40"
+                            out
+                              ? "cursor-not-allowed border-border bg-muted/40 opacity-60"
+                              : selected
+                                ? "border-primary bg-primary/5"
+                                : "border-border bg-card hover:border-primary/40"
                           }`}
                         >
                           {f.image && (
@@ -468,7 +495,14 @@ export function ProductCard({
                             />
                           )}
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold">{f.name}</p>
+                            <p className="text-sm font-semibold">
+                              {f.name}
+                              {out && (
+                                <span className="ml-2 text-xs font-bold uppercase tracking-wider text-destructive">
+                                  Esgotado
+                                </span>
+                              )}
+                            </p>
                             <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                               {f.description}
                             </p>
