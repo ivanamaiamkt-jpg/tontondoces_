@@ -252,6 +252,13 @@ export function useOrderAlerts(fetchNew?: () => Promise<NewOrder[] | null>) {
     playOrderSound();
   }, []);
 
+  /** Toca o som do aviso (dentro de um clique) pra ela conferir o volume. */
+  const testSound = useCallback(async () => {
+    await unlockAudio();
+    setSoundBlocked(isAudioBlocked());
+    playOrderSound();
+  }, []);
+
   const disableAlerts = useCallback(() => {
     writeFlag(ENABLED_KEY, false);
     setEnabledState(false);
@@ -270,6 +277,7 @@ export function useOrderAlerts(fetchNew?: () => Promise<NewOrder[] | null>) {
     enabled,
     enableAlerts,
     disableAlerts,
+    testSound,
     soundBlocked,
     notifPermission,
     keepAwake,

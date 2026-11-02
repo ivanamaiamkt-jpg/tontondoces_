@@ -48,28 +48,72 @@ export function installAudioUnlock(): () => void {
   };
 }
 
-function tone(c: AudioContext, freq: number, start: number, dur: number, volume: number) {
+const masters = new WeakMap<BaseAudioContext, GainNode>();
+
+/** Saída comum do toque: tira o chiado agudo e passa por um compressor, que deixa o som bem mais
+ * forte (e constante) sem estourar o alto-falante do computador. */
+function master(c: BaseAudioContext): GainNode {
+  let g = masters.get(c);
+  if (g) return g;
+  g = c.createGain();
+  const lowpass = c.createBiquadFilter();
+  lowpass.type = "lowpass";
+  lowpass.frequency.value = 4500;
+  const comp = c.createDynamicsCompressor();
+  comp.threshold.value = -24;
+  comp.knee.value = 10;
+  comp.ratio.value = 12;
+  comp.attack.value = 0.002;
+  comp.release.value = 0.15;
+  // O compressor já nivela o som perto do máximo; este ganho final usa a folga que sobra (pico ≈ -1 dB).
+  const boost = c.createGain();
+  boost.gain.value = 1.7;
+  g.connect(lowpass);
+  lowpass.connect(comp);
+  comp.connect(boost);
+  boost.connect(c.destination);
+  masters.set(c, g);
+  return g;
+}
+
+function tone(
+  c: BaseAudioContext,
+  freq: number,
+  start: number,
+  dur: number,
+  volume: number,
+  type: OscillatorType,
+) {
   const o = c.createOscillator();
   const g = c.createGain();
-  o.type = "sine";
+  o.type = type;
   o.frequency.value = freq;
   g.gain.setValueAtTime(0.0001, start);
-  g.gain.exponentialRampToValueAtTime(volume, start + 0.02);
+  g.gain.exponentialRampToValueAtTime(volume, start + 0.01);
+  g.gain.setValueAtTime(volume, start + dur * 0.6);
   g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
   o.connect(g);
-  g.connect(c.destination);
+  g.connect(master(c));
   o.start(start);
   o.stop(start + dur + 0.05);
 }
 
-/** Toque de pedido novo: três notas, mais alto e comprido que um "bip" (difícil de não ouvir). */
+/** Toque de pedido novo: três "campainhas" de duas notas (uns 2 s). Onda quadrada + grave por baixo
+ * soa bem mais alto que a senoide antiga e se ouve até com barulho de cozinha. */
+export function scheduleOrderSound(c: BaseAudioContext, t: number) {
+  for (let i = 0; i < 3; i++) {
+    const s = t + i * 0.75;
+    tone(c, 1568, s, 0.22, 0.5, "square");
+    tone(c, 784, s, 0.22, 0.3, "triangle");
+    tone(c, 1175, s + 0.24, 0.42, 0.5, "square");
+    tone(c, 587, s + 0.24, 0.42, 0.3, "triangle");
+  }
+}
+
 export function playOrderSound() {
   const c = getCtx();
   if (!c) return;
   if (c.state === "suspended") c.resume().catch(() => {});
   if (c.state !== "running") return;
-  const t = c.currentTime + 0.02;
-  tone(c, 880, t, 0.28, 0.45);
-  tone(c, 1175, t + 0.3, 0.28, 0.45);
-  tone(c, 1568, t + 0.6, 0.5, 0.45);
+  scheduleOrderSound(c, c.currentTime + 0.02);
 }

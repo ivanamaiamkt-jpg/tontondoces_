@@ -97,6 +97,12 @@ export function OrderAlertPanel({ alerts }: { alerts: Alerts }) {
           </button>
         )}
         <button
+          onClick={() => void alerts.testSound()}
+          className="rounded-md border border-border px-2.5 py-1.5 font-medium text-muted-foreground hover:bg-muted"
+        >
+          Testar som
+        </button>
+        <button
           onClick={alerts.toggleKeepAwake}
           aria-pressed={alerts.keepAwake}
           className={`rounded-md border px-2.5 py-1.5 font-medium ${
