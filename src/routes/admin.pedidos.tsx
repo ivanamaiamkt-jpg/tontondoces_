@@ -108,7 +108,9 @@ function timeAgo(iso: string, now: number) {
 
 function waLink(phone: string, message: string) {
   const digits = phone.replace(/\D/g, "");
-  return `https://wa.me/55${digits}?text=${encodeURIComponent(message)}`;
+  // Telefone de cliente vem só com DDD; o do motoboy (Configurações) já vem com o 55 na frente.
+  const full = digits.length <= 11 ? `55${digits}` : digits;
+  return `https://wa.me/${full}?text=${encodeURIComponent(message)}`;
 }
 
 function buildAcceptMsg(o: Order) {
@@ -258,12 +260,22 @@ function OrderCardBody({ order: o, colId, h }: { order: Order; colId: string; h:
             </>
           ))}
         {colId === "na_rua" && (
-          <button
-            onClick={() => h.onDelivered(o)}
-            className="inline-flex items-center gap-1 rounded-md bg-gray-700 px-2 py-1 text-[11px] font-semibold text-white hover:bg-gray-800"
-          >
-            <Check className="h-3 w-3" /> Entregue
-          </button>
+          <>
+            {o.delivery_mode === "delivery" && (
+              <button
+                onClick={() => h.onDispatch(o)}
+                className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-amber-700"
+              >
+                <MessageCircle className="h-3 w-3" /> Reenviar pro motoboy
+              </button>
+            )}
+            <button
+              onClick={() => h.onDelivered(o)}
+              className="inline-flex items-center gap-1 rounded-md bg-gray-700 px-2 py-1 text-[11px] font-semibold text-white hover:bg-gray-800"
+            >
+              <Check className="h-3 w-3" /> Entregue
+            </button>
+          </>
         )}
         {colId === "entregue" && (
           <button
@@ -479,7 +491,8 @@ function PedidosPage() {
       toast.error("Cadastre o WhatsApp do motoboy em Configurações.");
       return;
     }
-    updateStatus(o.id, "na_rua");
+    // Só sai de "Pronto" na primeira vez; reenviar não mexe na coluna.
+    if (o.status === "aguardando_entrega") updateStatus(o.id, "na_rua");
     window.open(waLink(motoboyWhatsapp, buildMotoboyMsg(o)), "_blank");
   };
 
@@ -551,13 +564,21 @@ function PedidosPage() {
       )}
 
       {detail && (
-        <OrderDetailModal order={detail} onClose={() => setDetail(null)} />
+        <OrderDetailModal order={detail} onClose={() => setDetail(null)} onDispatch={handleDispatch} />
       )}
     </div>
   );
 }
 
-function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => void }) {
+function OrderDetailModal({
+  order,
+  onClose,
+  onDispatch,
+}: {
+  order: Order;
+  onClose: () => void;
+  onDispatch: (o: Order) => void;
+}) {
   return (
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-4 sm:items-center"
@@ -683,6 +704,16 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
           >
             <MessageCircle className="h-4 w-4" /> WhatsApp
           </a>
+          {order.delivery_mode === "delivery" &&
+            ["em_producao", "aguardando_entrega", "na_rua"].includes(order.status) && (
+              <button
+                onClick={() => onDispatch(order)}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+              >
+                <MessageCircle className="h-4 w-4" />{" "}
+                {order.status === "na_rua" ? "Reenviar pro motoboy" : "Enviar pro motoboy"}
+              </button>
+            )}
           <a
             href={`tel:${order.customer_phone}`}
             className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm hover:bg-muted"
