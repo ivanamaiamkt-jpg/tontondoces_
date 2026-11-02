@@ -71,7 +71,12 @@ type Order = {
   items: OrderItem[];
   created_at: string;
   pos_venda_feito: boolean;
+  /** Quando a loja conferiu o pagamento (PIX ou link); vazio = ainda não conferido. */
+  paid_at: string | null;
 };
+
+/** PIX e link são pagos antes; maquininha se paga na entrega/retirada (não precisa marcar). */
+const paidInAdvance = (o: Order) => o.payment_method === "pix" || o.payment_method === "link";
 
 type ColumnDef = {
   id: string;
@@ -145,9 +150,13 @@ function buildMotoboyMsg(o: Order) {
       : "Retirada no local";
   const pagamentoLine =
     o.payment_method === "pix"
-      ? "PIX (já pago)"
+      ? o.paid_at
+        ? "PIX (já pago)"
+        : "PIX (pagamento ainda não confirmado)"
       : o.payment_method === "link"
-        ? "Link de pagamento (pago online)"
+        ? o.paid_at
+          ? "Link de pagamento (pago online)"
+          : "Link de pagamento (pagamento ainda não confirmado)"
         : "Maquininha (cobrar na entrega)";
   const link =
     typeof window !== "undefined" ? `${window.location.origin}/entrega/${o.id}` : "";
@@ -174,6 +183,7 @@ type CardHandlers = {
   onNotify: (o: Order) => void;
   onDispatch: (o: Order) => void;
   onDelivered: (o: Order) => void;
+  onMarkPaid: (o: Order, paid: boolean) => void;
   onAskReview: (o: Order) => void;
   onRemove: (id: string) => void;
 };
@@ -193,6 +203,15 @@ function OrderCardBody({ order: o, colId, h }: { order: Order; colId: string; h:
         {receivingLabel(o)} · {o.payment_method === "link" ? "Link" : paymentLabel(o.payment_method)}
       </p>
       <p className="mt-1 font-display text-lg text-primary">{brl(Number(o.total))}</p>
+      {paidInAdvance(o) && (
+        <p
+          className={`mt-1 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold ${
+            o.paid_at ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+          }`}
+        >
+          {o.paid_at ? "✅ Pago" : "⏳ Aguardando pagamento"}
+        </p>
+      )}
       {(o.items ?? []).some((it) => it.productId === GIFT_PRODUCT_ID) && (
         <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-800">
           🎁 {GIFT_INTERNAL_LABEL}
@@ -209,6 +228,15 @@ function OrderCardBody({ order: o, colId, h }: { order: Order; colId: string; h:
           >
             <MessageCircle className="h-3 w-3" /> WhatsApp
           </a>
+        )}
+
+        {paidInAdvance(o) && !o.paid_at && (
+          <button
+            onClick={() => h.onMarkPaid(o, true)}
+            className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
+          >
+            <Check className="h-3 w-3" /> Marcar como pago
+          </button>
         )}
 
         {colId === "novo" && (
@@ -241,7 +269,7 @@ function OrderCardBody({ order: o, colId, h }: { order: Order; colId: string; h:
               onClick={() => h.onDispatch(o)}
               className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-amber-700"
             >
-              <MessageCircle className="h-3 w-3" /> Enviar pro motoboy
+              <MessageCircle className="h-3 w-3" /> Enviar informações pro motoboy
             </button>
           ) : (
             <>
@@ -266,7 +294,7 @@ function OrderCardBody({ order: o, colId, h }: { order: Order; colId: string; h:
                 onClick={() => h.onDispatch(o)}
                 className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-amber-700"
               >
-                <MessageCircle className="h-3 w-3" /> Reenviar pro motoboy
+                <MessageCircle className="h-3 w-3" /> Reenviar informações pro motoboy
               </button>
             )}
             <button
@@ -498,6 +526,22 @@ function PedidosPage() {
 
   const handleDelivered = (o: Order) => updateStatus(o.id, "entregue");
 
+  const markPaid = async (o: Order, paid: boolean) => {
+    const paid_at = paid ? new Date().toISOString() : null;
+    setOrders((prev) => prev.map((x) => (x.id === o.id ? { ...x, paid_at } : x)));
+    setDetail((d) => (d && d.id === o.id ? { ...d, paid_at } : d));
+    const { error } = await (supabase
+      .from("orders" as never)
+      .update({ paid_at } as never)
+      .eq("id", o.id));
+    if (error) {
+      toast.error("Erro: " + error.message);
+      load();
+    } else {
+      toast.success(paid ? "Pagamento marcado como feito ✅" : "Pagamento desmarcado");
+    }
+  };
+
   const markPosVenda = async (o: Order, pos_venda_feito: boolean) => {
     setOrders((prev) => prev.map((x) => (x.id === o.id ? { ...x, pos_venda_feito } : x)));
     const { error } = await (supabase
@@ -524,6 +568,7 @@ function PedidosPage() {
     onNotify: handleNotify,
     onDispatch: handleDispatch,
     onDelivered: handleDelivered,
+    onMarkPaid: markPaid,
     onAskReview: handleAskReview,
     onRemove: remove,
   };
@@ -564,7 +609,12 @@ function PedidosPage() {
       )}
 
       {detail && (
-        <OrderDetailModal order={detail} onClose={() => setDetail(null)} onDispatch={handleDispatch} />
+        <OrderDetailModal
+          order={detail}
+          onClose={() => setDetail(null)}
+          onDispatch={handleDispatch}
+          onMarkPaid={markPaid}
+        />
       )}
     </div>
   );
@@ -574,10 +624,12 @@ function OrderDetailModal({
   order,
   onClose,
   onDispatch,
+  onMarkPaid,
 }: {
   order: Order;
   onClose: () => void;
   onDispatch: (o: Order) => void;
+  onMarkPaid: (o: Order, paid: boolean) => void;
 }) {
   return (
     <div
@@ -673,6 +725,25 @@ function OrderDetailModal({
                   ? "Cartão (na entrega)"
                   : "Cartão (na retirada)"}
             </p>
+            {paidInAdvance(order) && (
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span
+                  className={`rounded-md px-2 py-0.5 text-xs font-semibold ${
+                    order.paid_at ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                  }`}
+                >
+                  {order.paid_at
+                    ? `✅ Pago em ${new Date(order.paid_at).toLocaleString("pt-BR")}`
+                    : "⏳ Aguardando pagamento"}
+                </span>
+                <button
+                  onClick={() => onMarkPaid(order, !order.paid_at)}
+                  className="rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted"
+                >
+                  {order.paid_at ? "Desmarcar" : "Marcar como pago"}
+                </button>
+              </div>
+            )}
           </section>
 
           {order.notes && (
@@ -711,7 +782,9 @@ function OrderDetailModal({
                 className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700"
               >
                 <MessageCircle className="h-4 w-4" />{" "}
-                {order.status === "na_rua" ? "Reenviar pro motoboy" : "Enviar pro motoboy"}
+                {order.status === "na_rua"
+                  ? "Reenviar informações pro motoboy"
+                  : "Enviar informações pro motoboy"}
               </button>
             )}
           <a
