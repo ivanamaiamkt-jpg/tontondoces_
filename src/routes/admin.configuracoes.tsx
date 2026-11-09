@@ -62,6 +62,7 @@ const FIELDS: Field[] = [
   {
     key: "store_open",
     label: "Loja aberta?",
+    help: "Fechada: o site mostra \"Fechado\" e a mensagem abaixo, em vez do horário. O cliente ainda consegue fazer o pedido (igual a fora do horário). Vale em até 1 minuto depois de salvar.",
     type: "select",
     options: [
       { value: "true", label: "Aberta" },

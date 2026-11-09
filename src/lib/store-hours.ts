@@ -60,11 +60,20 @@ export type StoreStatus = {
   opensAt: string;
   /** Texto resumido pronto pra exibir. */
   label: string;
+  /** true quando a loja foi fechada à mão ("Loja aberta?" = Fechada em Configurações). */
+  manual?: boolean;
 };
+
+/** "Loja aberta?" e "Mensagem quando fechada" das Configurações do painel. */
+export type StoreClosure = { closed: boolean; message: string };
 
 import { isPaused, PAUSE_UNTIL } from "./pause-mode";
 
-export function getStoreStatus(now: Date = new Date()): StoreStatus {
+export function getStoreStatus(now: Date = new Date(), closure?: StoreClosure): StoreStatus {
+  // Fechada à mão vale acima do horário da semana.
+  if (closure?.closed) {
+    return { open: false, closesAt: "", opensAt: "", label: "🔴 Fechado", manual: true };
+  }
   if (isPaused(now)) {
     const reopen = new Intl.DateTimeFormat("pt-BR", {
       timeZone: "America/Sao_Paulo",

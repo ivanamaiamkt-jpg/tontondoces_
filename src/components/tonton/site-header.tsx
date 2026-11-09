@@ -1,15 +1,9 @@
-import { useEffect, useState } from "react";
 import { Clock, User } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { getStoreStatus } from "@/lib/store-hours";
+import { useStoreStatus } from "@/lib/store-open";
 
 export function SiteHeader() {
-  const [status, setStatus] = useState(() => getStoreStatus());
-
-  useEffect(() => {
-    const id = setInterval(() => setStatus(getStoreStatus()), 60_000);
-    return () => clearInterval(id);
-  }, []);
+  const status = useStoreStatus();
 
   return (
     <header className="sticky top-0 z-40 border-b border-black/20 backdrop-blur" style={{ backgroundColor: "#5c1f5c" }}>
@@ -32,13 +26,15 @@ export function SiteHeader() {
             <span className="h-1.5 w-1.5 rounded-full bg-white" />
             {status.open ? "Aberto" : "Fechado"}
           </span>
-          <span
-            className="hidden items-center gap-1 rounded-full border border-white/20 bg-white/5 px-2.5 py-1 text-xs font-medium sm:inline-flex"
-            style={{ color: "#f5e6c8" }}
-          >
-            <Clock className="h-3 w-3" style={{ color: "#f5e6c8" }} />
-            {status.open ? `Fecha às ${status.closesAt}` : `Abre ${status.opensAt}`}
-          </span>
+          {(status.open || status.opensAt) && (
+            <span
+              className="hidden items-center gap-1 rounded-full border border-white/20 bg-white/5 px-2.5 py-1 text-xs font-medium sm:inline-flex"
+              style={{ color: "#f5e6c8" }}
+            >
+              <Clock className="h-3 w-3" style={{ color: "#f5e6c8" }} />
+              {status.open ? `Fecha às ${status.closesAt}` : `Abre ${status.opensAt}`}
+            </span>
+          )}
           <Link
             to="/meus-pedidos"
             className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/5 px-2.5 py-1 text-xs font-medium hover:bg-white/10"

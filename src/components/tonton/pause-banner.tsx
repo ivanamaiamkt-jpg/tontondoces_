@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { isPaused, PAUSE_BANNER_TEXT, PAUSE_UNTIL } from "@/lib/pause-mode";
+import { useStoreStatus } from "@/lib/store-open";
 
+/** Faixa no topo: pausa programada ou loja fechada à mão (com a mensagem escrita em Configurações). */
 export function PauseBanner() {
+  const store = useStoreStatus();
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -17,7 +20,8 @@ export function PauseBanner() {
     };
   }, []);
 
-  if (!show) return null;
+  const text = store.manual && store.message ? store.message : show ? PAUSE_BANNER_TEXT : null;
+  if (!text) return null;
 
   return (
     <div
@@ -33,7 +37,7 @@ export function PauseBanner() {
         lineHeight: 1.4,
       }}
     >
-      {PAUSE_BANNER_TEXT}
+      {text}
     </div>
   );
 }

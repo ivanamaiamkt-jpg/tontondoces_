@@ -7,6 +7,7 @@ import { getMergedCategories } from "@/lib/menu-overrides";
 import { useMinOrder } from "@/lib/min-order";
 import { useDeliverySettings } from "@/lib/delivery";
 import { useGiftMin } from "@/lib/gift";
+import { fetchStoreClosure, seedStoreClosure } from "@/lib/store-open";
 import { brl } from "@/lib/format";
 import { CategoryBanner } from "@/components/tonton/category-banner";
 import { ProductCard } from "@/components/tonton/product-card";
@@ -32,17 +33,20 @@ export const Route = createFileRoute("/")({
   // Esgotados e arquivados já vêm resolvidos no HTML, pra um produto arquivado
   // nunca aparecer nem por um instante. Se o banco demorar, segue sem eles.
   loader: async () => {
+    const wait = <T,>(p: Promise<T>) =>
+      Promise.race([p, new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000))]);
     try {
-      const state = await Promise.race([
-        getAvailabilityState(),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+      const [state, closure] = await Promise.all([
+        wait(getAvailabilityState()),
+        wait(fetchStoreClosure()),
       ]);
       return {
         soldOut: state ? [...state.soldOut] : [],
         archived: state ? [...state.archived] : [],
+        closure,
       };
     } catch {
-      return { soldOut: [] as string[], archived: [] as string[] };
+      return { soldOut: [] as string[], archived: [] as string[], closure: null };
     }
   },
   head: () => ({
@@ -58,6 +62,7 @@ function HomePage() {
   const delivery = useDeliverySettings();
   const giftMin = useGiftMin();
   const initial = Route.useLoaderData();
+  seedStoreClosure(initial.closure);
   const [soldOut, setSoldOut] = useState<Set<string>>(() => new Set(initial.soldOut));
   const [archived, setArchived] = useState<Set<string>>(() => new Set(initial.archived));
   const [merged, setMerged] = useState<Category[]>(CATEGORIES);

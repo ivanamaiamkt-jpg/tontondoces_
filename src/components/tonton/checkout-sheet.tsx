@@ -38,7 +38,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackPixel } from "@/lib/fbq";
 import { syncAbandonedCart, markCartConverted } from "@/lib/abandoned-cart";
 import { getStoredUtm } from "@/lib/analytics";
-import { getStoreStatus } from "@/lib/store-hours";
+import { useStoreStatus } from "@/lib/store-open";
 import { isPaused, PAUSE_WHATSAPP_NOTE } from "@/lib/pause-mode";
 
 type Receiving = "pickup" | "uber" | "delivery";
@@ -102,7 +102,7 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
     addressLine?: string;
   } | null>(null);
   const [sent, setSent] = useState(false);
-  const [storeStatus, setStoreStatus] = useState(() => getStoreStatus());
+  const storeStatus = useStoreStatus();
   const pixKey = usePixKey();
   const uid = useId();
   // Código do pedido e número ficam os mesmos se o cliente tentar de novo (evita pedido duplicado).
@@ -112,11 +112,6 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
   const dialogRef = useDialogA11y<HTMLDivElement>(open, () => {
     if (!confirmed) onClose();
   });
-
-  useEffect(() => {
-    const id = setInterval(() => setStoreStatus(getStoreStatus()), 60_000);
-    return () => clearInterval(id);
-  }, []);
 
   useEffect(() => {
     if (customer?.name && !name) setName(customer.name);
@@ -1032,7 +1027,9 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
                 <>
                   {!storeStatus.open && (
                     <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
-                      ⚠️ Estamos fechados agora. Seu pedido será confirmado quando abrirmos ({storeStatus.opensAt}).
+                      {storeStatus.manual
+                        ? `⚠️ ${storeStatus.message || "Estamos fechados agora."}`
+                        : `⚠️ Estamos fechados agora. Seu pedido será confirmado quando abrirmos (${storeStatus.opensAt}).`}
                     </div>
                   )}
                   <Button
