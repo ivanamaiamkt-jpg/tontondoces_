@@ -329,20 +329,25 @@ export function CheckoutSheet({ open, onClose }: { open: boolean; onClose: () =>
 
     const summary = lines.join("\n");
 
-    trackPixel("Purchase", {
-      value: total,
-      currency: "BRL",
-      contents: items.map((it) => ({ id: it.productId, quantity: it.quantity })),
-      content_type: "product",
-      num_items: items.reduce((s, it) => s + it.quantity, 0),
-      order_id: orderId,
-    });
+    // Só conta como compra (Meta) e fecha o carrinho se o pedido foi mesmo salvo. Se o banco não
+    // respondeu, o carrinho segue como abandonado (a loja ainda consegue chamar a pessoa) e o
+    // pixel não registra uma compra que a loja nunca vai ver.
+    if (saved) {
+      trackPixel("Purchase", {
+        value: total,
+        currency: "BRL",
+        contents: items.map((it) => ({ id: it.productId, quantity: it.quantity })),
+        content_type: "product",
+        num_items: items.reduce((s, it) => s + it.quantity, 0),
+        order_id: orderId,
+      });
 
-    // Carrinho vira "convertido" (antes ele voltava a "ativo" logo depois e quem comprou aparecia como abandonado).
-    if (name.trim().length >= 2 && phoneDigits.length >= 10) {
-      void syncAbandonedCart({ nome: name, telefone: phoneDigits, items, status: "convertido" });
-    } else {
-      void markCartConverted(items);
+      // Carrinho vira "convertido" (antes ele voltava a "ativo" logo depois e quem comprou aparecia como abandonado).
+      if (name.trim().length >= 2 && phoneDigits.length >= 10) {
+        void syncAbandonedCart({ nome: name, telefone: phoneDigits, items, status: "convertido" });
+      } else {
+        void markCartConverted(items);
+      }
     }
 
     setConfirmed({
